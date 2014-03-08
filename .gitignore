@@ -1,0 +1,4 @@
+.cvsignore
+CVS
+*.pyc
+.DS_Store 
