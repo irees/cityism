@@ -1,4 +1,4 @@
-# American Community Survey Tools.
+# Cityism
 
 This is a tool for parsing data from various Census and American Community Survey data sets, loading into a PostGIS database, and performing various queries that are interesting to me.
 
