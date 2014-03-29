@@ -1,3 +1,4 @@
+"""Base query."""
 import argparse
 import collections
 import csv

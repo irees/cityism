@@ -1,3 +1,4 @@
+"""Human Development Index"""
 import math
 import argparse
 import json
@@ -120,12 +121,14 @@ import cityism.query
 # ACSSF,B19301,0064,1, ,, ,Per capita income in the past 12 months (in 2012 inflation-adjusted dollars),
 
 def filterattr(items, key, minvalue=0, value=None):
+    """Filter objects by attr"""
     ret = [getattr(i, key, None) for i in items]
     if minvalue is not None:
         return [i for i in ret if i > minvalue]
     return [i for i in ret if i == value]
 
 def acsrange(base, start=None, end=None, cols=None):
+    """ACS table column range."""
     if start is not None:
         cols = range(start, (end or start)+1)
     elif cols:
@@ -186,8 +189,8 @@ class HDIRegion(object):
         ['phd',   24, 'b15003_025']
     ]    
 
-    # Container for HDI calculations.
     def __init__(self, **kwargs):
+        """Set display attributes: geoid, geom, countyfp, statefp"""
         # Display
         self.geoid = kwargs.get('geoid')
         self.geom = kwargs.get('geom')
@@ -214,6 +217,7 @@ class HDIRegion(object):
         return "%s, %s"%(c, s)
     
     def data(self):
+        """Return dict, e.g. for insert."""
         return self.__dict__
     
     def row_eys(self, row):
@@ -297,8 +301,9 @@ class QueryHDI(cityism.query.Query):
     """This map applies the United Nations Development Programme Human
     Development Index (HDI) -- a composite measure of Life Expectancy,
     Education, and Income levels -- to United States census tracts. While the
-    UN HDI spans across the globe, this "disaggregated" HDI is normalized across 74,133 tracts
-    to show relative differences within a single country."""
+    UN HDI spans across the globe, this "disaggregated" HDI is normalized
+    across 74,133 tracts to show relative differences within a single
+    country."""
 
     # TileMill notes:
     # +proj=longlat +ellps=GRS80 +datum=NAD83 +no_defs.
@@ -310,8 +315,8 @@ class QueryHDI(cityism.query.Query):
     # B19301 PER CAPITA INCOME IN THE PAST 12 MONTHS (IN 2012 INFLATION-ADJUSTED DOLLARS)
     
     def query(self, level='tracts', statefp='06', countyfp='075'):
-        assert level in ['tracts', 'blocks', 'counties', 'states']
         # Grab the ACS tables for education, income, life expectancy.
+        assert level in ['tracts', 'blocks', 'counties', 'states']
         query = """
             SELECT
                 %(level)s.gid,
@@ -373,7 +378,7 @@ class QueryHDI(cityism.query.Query):
         return regions
         
     def stats(self, regions):
-        # HDI Statistics...
+        """Region statistics."""
         for region in sorted(regions, key=lambda x:x.hdi):
             print "==========", region.geoid
             for k,v in sorted(region.data().items()):
@@ -400,12 +405,11 @@ class QueryHDI(cityism.query.Query):
         print "HDI Components:"
         for key in ['hdi', 'ei', 'ii', 'lei']:
             statattr(regions, key)
-        
 
     def save_query(self, regions, table):
-        # Copy the geometry to simplify export...
+        """Save regions to table."""
         query_create = """
-            DROP TABLE IF EXISTS result_hdi;
+            DROP TABLE IF EXISTS %(table)s;
             CREATE TABLE result_hdi (
                 gid serial NOT NULL PRIMARY KEY,
                 geoid varchar,
@@ -424,10 +428,10 @@ class QueryHDI(cityism.query.Query):
             );
             SELECT 
                 AddGeometryColumn('result_hdi', 'geom', 4269, 'MultiPolygon', 2);
-        """
+        """%{'table':table}
         
         query_insert = """
-            INSERT INTO result_hdi(
+            INSERT INTO %(table)s(
                 geoid, 
                 statefp,
                 countyfp,
@@ -444,24 +448,25 @@ class QueryHDI(cityism.query.Query):
                 geom
             ) 
             VALUES (
-                %(geoid)s, 
-                %(statefp)s,
-                %(countyfp)s,
-                %(label)s,
-                %(hdi)s,
-                %(ei)s, 
-                %(ii)s, 
-                %(lei)s, 
-                %(mys)s, 
-                %(eys)s, 
-                %(income)s, 
-                %(le)s,
-                %(pop)s,
-                ST_GeomFromText(%(geom)s, 4269)
+                %%(geoid)s, 
+                %%(statefp)s,
+                %%(countyfp)s,
+                %%(label)s,
+                %%(hdi)s,
+                %%(ei)s, 
+                %%(ii)s, 
+                %%(lei)s, 
+                %%(mys)s, 
+                %%(eys)s, 
+                %%(income)s, 
+                %%(le)s,
+                %%(pop)s,
+                ST_GeomFromText(%%(geom)s, 4269)
             );
-        """
+        """%{'table':table}
+        
         with self.conn.cursor() as cursor:
-            print "create result table..."    
+            print "Saving to: %s"%table    
             cursor.execute(query_create)
             for region in regions:
                 print "insert: ", region.geoid

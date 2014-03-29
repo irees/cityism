@@ -1,3 +1,4 @@
+"""Radial query."""
 import math
 import argparse
 
