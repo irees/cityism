@@ -14,55 +14,32 @@ import inspect
 import glob
 
 # Import TIGER Shapefiles:
-# shp2pgsql -d -I -s 4269 tl_2012_48_tract.shp tracts | psql -d acs
 
-class ACSParser(object):
-    """American Community Survey data."""
-    
-    def __init__(self, year=2012, span=5, state='tx', acstable=None):
-        """Parse ACS summary survey files."""
-        self.year = year
-        self.span = span
-        self.state = state
-        self.acstable = acstable
+# TRACTS
+# shp2pgsql -p -I -s 4269 tl_2012_01_tract.shp tracts | psql -d acs
+# for i in *.shp;do shp2pgsql -s 4269 -a $i tracts | psql -d acs;done
 
-    def load(self):
-        """Load data from the specified ACS survey summary files. Return ACSTracts."""
-        # Get ACSMeta table.
-        acstable = TABLES.get(self.acstable)
-        
-        # Load logrecno / tract ID map.
-        geom = ACSGeometry(self.year, self.span, self.state)
-        geom.load()
+# BLOCKS
+# shp2pgsql -p -I -s 4269 tl_2012_01_tabblock.shp blocks | psql -d acs
+# for i in tl_2012_*tabblock.shp;do shp2pgsql -s 4269 -a $i blocks | psql -d acs;done
 
-        # Load the data file.
-        ret = []
-        pattern = 'e%04d%01d%s%04d%03d.txt'%(self.year, self.span, self.state, acstable.seqno, 0)
-        if self.state == '*':
-            filenames = glob.glob(pattern)
-        else:
-            filenames = [pattern]
-        for filename in filenames:
-            print "Loading ACS data: %s"%filename
-            with open(filename) as f:
-                reader = csv.reader(f)
-                for row in reader:                
-                    tract = acstable.parse(row, geom=geom)
-                    ret.append(tract)
-            return ret
+# COUNTIES
+# shp2pgsql -p -I -s 4269 tl_2012_us_county.shp counties | psql -d acs
+# shp2pgsql -W LATIN1 -s 4269 -a tl_2012_us_county.shp counties | psql -d acs
 
-class ACSTract(object):
-    """Census Tract / Block / Block Group."""
+# STATES
+# shp2pgsql -p -I -s 4269 tl_2012_us_state.shp states | psql -d acs
+# shp2pgsql -s 4269 -a tl_2012_us_state.shp states | psql -d acs
 
-    logrecno = property(lambda self:self.data['logrecno'])
-    geoid = property(lambda self:self.data['geoid'])
-    
-    def __init__(self, logrecno=None, geoid=None, data=None):
-        """Base properties are logrecno and geoid. Data is dict of add'l
-        props."""
-        self.data = data or {}
-        self.data['logrecno'] = logrecno
-        self.data['geoid'] = geoid
+INTERESTING = ['B08303', 'B01001', 'B01002', 'B01003', 'B02001',
+'B03002', 'B05001', 'B07002', 'B07009', 'B07010', 'B08006', 'B08012', 'B08119',
+'B08121', 'B08124', 'B08126', 'B08134', 'B08141', 'B08301', 'B08519', 'B08521',
+'B08526', 'B08601', 'B09001', 'B09002', 'B13002', 'B15001', 'B15002', 'B15003',
+'B17001', 'B19001', 'B19061', 'B19083', 'B19101', 'B19301', 'B24011', 'B24121',
+'B25001', 'B25002', 'B25003', 'B25004', 'B25009', 'B25010', 'B25012', 'B25014',
+'B25024', 'B25026', 'B25034', 'B25038', 'B25045', 'B25046', 'B25056', 'B25061',
+'B25063', 'B25064', 'B25070', 'B25075', 'B25081', 'B25087', 'B25113', 'B25115',
+'C24010']
 
 class ACSMeta(object):
     """American Community Survey table definitions.
@@ -88,8 +65,8 @@ class ACSMeta(object):
     # ['ACSSF',   'B25034',   '0104',            ' ',           '7',              '10 CELLS',             ' ',                       'YEAR STRUCTURE BUILT', 'Housing']
     
     # Class attr
-    acstables = {}
-    loaded = False
+    ACSTABLES = {}
+    LOADED = False
 
     # Properties
     acstable = property(lambda self:self.data['acstable'])
@@ -111,6 +88,9 @@ class ACSMeta(object):
             Table Title,
             Subject Area
         """
+
+        if lineno:
+            acstable = '%s_%03d'%(acstable, float(lineno))
         self.data = dict(
             acstable = acstable,
             seqno = self._int(seqno),
@@ -126,7 +106,7 @@ class ACSMeta(object):
     @classmethod
     def load(cls, filename):
         """Class method to load ACS table definition."""
-        if cls.loaded:
+        if cls.LOADED:
             return
         print "Loading ACS table definitions: %s"%filename
         with open(filename) as f:
@@ -134,6 +114,7 @@ class ACSMeta(object):
             header = reader.next()
             for row in reader:
                 row = [i.strip() for i in row]
+                basetable = row[1]
                 t = ACSMeta(
                     acstable = row[1],
                     seqno    = row[2],
@@ -144,27 +125,28 @@ class ACSMeta(object):
                     title    = row[7],
                     subject  = row[8]
                 )
-                if t.seqstart is not None:
-                    cls.acstables[t.acstable] = t
+                if t.seqstart is None:
+                    cls.ACSTABLES[basetable.lower()].addchild(t)        
                 else:
-                    cls.acstables[t.acstable].addchild(t)        
-        cls.loaded = True
+                    cls.ACSTABLES[t.acstable.lower()] = t
+        cls.LOADED = True
 
     @classmethod
     def get(cls, acstable):
         """Get an ACS table definition by name, e.g. "B25034". """
-        if acstable in cls.acstables:
-            return cls.acstables[acstable]
+        acstable = acstable.lower()
+        if acstable in cls.ACSTABLES:
+            return cls.ACSTABLES[acstable]
         raise KeyError("Unknown ACS table: %s"%acstable)
 
     def addchild(self, child):
         """Add a child ACSMeta. For instance, "B25034" has 10 children
         corresponding to the 10 data columns."""
         if child.lineno is not None:
-            child.data['acstable'] = '%s_%03d'%(child.acstable, child.lineno)
             self.children[child.lineno] = child
 
     def getchildren(self):
+        """Get children (columns) in this table."""
         return [v for k,v in sorted(self.children.items())]
         
     def printchildren(self):
@@ -173,12 +155,32 @@ class ACSMeta(object):
         for k,v in sorted(self.children.items()):
             print "\t", v.title
 
+    ##### Read files #####
+
+    def read(self, year=2012, span=5, state='ca'):
+        """Load data from the specified ACS survey summary files. Return ACSTracts."""
+        # Load the data files.
+        ret = []
+
+        # Load logrecno / tract ID map.
+        geom = ACSGeometry(year, span, state)
+        geom.load()
+        
+        # Load ACS data.        
+        filename = 'e%04d%01d%s%04d%03d.txt'%(year, span, state, self.seqno, 0)
+        print "Loading ACS data: %s"%filename
+        with open(filename) as f:
+            reader = csv.reader(f)
+            for row in reader:                
+                tract = self.parse(row, geom=geom)
+                ret.append(tract)
+        return ret
+
     def parse(self, row, geom=None):
         """Parse a row of an ACS summary data file. Return ACSTract."""
         data = {}
         for k,v in sorted(self.children.items()):
             # Have to do this b/c titles are not unique.
-            # key = '%s / %s (%s)'%(self.title, v.title, k)
             value = row[self.seqstart+k-2] # -2 because indexed at 1.
             data[v.acstable] = self._int(value)
 
@@ -195,9 +197,22 @@ class ACSMeta(object):
         except Exception, e:
             return None
 
+class ACSTract(object):
+    """Census Tract / Block / Block Group."""
+
+    logrecno = property(lambda self:self.data['logrecno'])
+    geoid = property(lambda self:self.data['geoid'])
+
+    def __init__(self, logrecno=None, geoid=None, data=None):
+        """Base properties are logrecno and geoid. Data is dict of add'l
+        props."""
+        self.data = data or {}
+        self.data['logrecno'] = logrecno
+        self.data['geoid'] = geoid
+
 class ACSGeometry(object):
     """Parse ACS Geometry file. This maps tract logrecno IDs to Census IDs."""
-    
+        
     def __init__(self, year, span, state):
         """Year, survey span, and state."""
         self.year = year
@@ -208,7 +223,7 @@ class ACSGeometry(object):
     def load(self):
         """Load the geometry file."""
         geofile = 'g%04d%01d%s.csv'%(self.year, self.span, self.state)
-        print "Loading ACS Geometry: %s"%geofile
+        print "Loading ACS Geometry: %s"%geofile        
         with open(geofile) as f:
             reader = csv.reader(f)
             for row in reader:
@@ -245,14 +260,57 @@ class ACSShape(object):
             return self.shapes.get(geoid)
         return None, None
         
+class ACSFips(object):
+    """FIPS codes for counties and states.
+    
+    H1: identifies an active county or statistically equivalent entity that
+    does not qualify under subclass C7 or H6.
+
+    H4: identifies a legally defined inactive or nonfunctioning county or
+    statistically equivalent entity that does not qualify under subclass H6.
+
+    H5: identifies census areas in Alaska, a statistical county equivalent
+    entity.
+
+    H6: identifies a county or statistically equivalent entity that is areally
+    coextensive or governmentally consolidated with an incorporated place, part
+    of an incorporated place, or a consolidated city.
+
+    C7: identifies an incorporated place that is an independent city; that is, it
+    also serves as a county equivalent because it is not part of any county, and a
+    minor civil division (MCD) equivalent because it is not part of any MCD.
+    """
+    ANSI_STATES = {}
+    ANSI_STATES_COUNTIES = {}
+    STATES_ANSI = {}
+
+    @classmethod
+    def load(cls, filename):
+        """Load the FIPS file."""
+        print "Loading ACS FIPS mapping: %s"%filename
+        with open(filename) as f:
+            reader = csv.reader(f)
+            header = reader.next()
+            for row in reader:
+                state, statefp, countyfp, county, c = row
+                cls.ANSI_STATES[statefp] = state
+                cls.ANSI_STATES_COUNTIES[(statefp, countyfp)] = county
+                cls.STATES_ANSI[state] = statefp
+        
 ##### Load the ACS Table metadata #####
 
-TABLES = ACSMeta()
 def _load_acsmeta(acsmetapath=None):
     share = os.path.dirname(inspect.getfile(inspect.currentframe()))
     default = "Sequence_Number_and_Table_Number_Lookup.txt"
-    TABLES.load(acsmetapath or os.path.join(share, 'docs', default))
-_load_acsmeta()    
+    ACSMeta.load(acsmetapath or os.path.join(share, 'docs', default))
+    
+def _load_acsfips(acsfipspath=None):
+    share = os.path.dirname(inspect.getfile(inspect.currentframe()))
+    default = "national_county_fips.csv"
+    ACSFips.load(acsfipspath or os.path.join(share, 'docs', default))
+        
 
+_load_acsmeta()    
+_load_acsfips()
 
 

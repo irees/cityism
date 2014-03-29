@@ -1,4 +1,5 @@
 import psycopg2
+import psycopg2.extras
 
 srid = 4269
 
@@ -9,6 +10,9 @@ port = 5432
 dbname = 'acs'
 
 def connect(**kwargs):
+    dictcursor = kwargs.pop('dictcursor', None)
     kw = {'dbname': dbname, 'user': user, 'password': password, 'host':host, 'port': port}
     kw.update(kwargs)
     return psycopg2.connect(**kw)
+    
+    
