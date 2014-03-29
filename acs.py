@@ -302,12 +302,12 @@ class ACSFips(object):
 def _load_acsmeta(acsmetapath=None):
     share = os.path.dirname(inspect.getfile(inspect.currentframe()))
     default = "Sequence_Number_and_Table_Number_Lookup.txt"
-    ACSMeta.load(acsmetapath or os.path.join(share, 'docs', default))
+    ACSMeta.load(acsmetapath or os.path.join(share, 'data', default))
     
 def _load_acsfips(acsfipspath=None):
     share = os.path.dirname(inspect.getfile(inspect.currentframe()))
     default = "national_county_fips.csv"
-    ACSFips.load(acsfipspath or os.path.join(share, 'docs', default))
+    ACSFips.load(acsfipspath or os.path.join(share, 'data', default))
         
 
 _load_acsmeta()    
