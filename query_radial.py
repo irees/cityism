@@ -8,9 +8,7 @@ import query
 
 class QueryRadial(cityism.query.Query):
     def query(self, city=None, x=None, y=None, acstable='B25034', radius_inner=0, radius_outer=1000, density=True, level='tracts'):
-        if level not in ['tracts', 'blocks', 'counties']:
-            raise Exception("Invalid level")
-        
+        assert level in ['tracts', 'blocks', 'counties', 'states']
         query = """
             WITH 
                 cupcake AS ( SELECT 

@@ -1,5 +1,5 @@
+"""Load data from ACS tables into SQL."""
 import argparse
-
 import cityism.acs
 import cityism.config
 

@@ -1,4 +1,23 @@
-"""Human Development Index"""
+"""Human Development Index.
+
+Methods and data:
+  http://hdr.undp.org/en/statistics/hdi
+  http://en.wikipedia.org/wiki/Human_Development_Index
+  http://ghdx.healthmetricsandevaluation.org/record/united-states-adult-life-expectancy-state-and-county-1987-2009
+
+This map was inspired by a county-by-county HDI map:
+  http://www.policymic.com/articles/85537/if-the-u-s-were-graded-using-the-un-s-index-for-african-development-here-s-what-we-d-see
+  http://ispol.com/sasha/hdi/
+
+For the calculations and notes, see:
+    HDIRegion:
+        row_mys
+        row_eys
+        row_le
+        row_income
+        calc_hdi
+        
+"""
 import math
 import argparse
 import json
@@ -11,8 +30,9 @@ import psycopg2.extras
 import cityism.acs
 import cityism.config
 import cityism.query
+from cityism.utils import *
 
-########### Reference ###########
+########### Reference for ACS tables used ###########
 
 # ACSSF,B01001,0002, ,7,49 CELLS, ,SEX BY AGE,Age-Sex
 # ACSSF,B01001,0002, , ,, ,Universe:  Total population,
@@ -120,44 +140,28 @@ import cityism.query
 # ACSSF,B19301,0064, , ,, ,Universe:  Total population,
 # ACSSF,B19301,0064,1, ,, ,Per capita income in the past 12 months (in 2012 inflation-adjusted dollars),
 
-def filterattr(items, key, minvalue=0, value=None):
-    """Filter objects by attr"""
-    ret = [getattr(i, key, None) for i in items]
-    if minvalue is not None:
-        return [i for i in ret if i > minvalue]
-    return [i for i in ret if i == value]
-
-def acsrange(base, start=None, end=None, cols=None):
-    """ACS table column range."""
-    if start is not None:
-        cols = range(start, (end or start)+1)
-    elif cols:
-        cols = cols
-    else:
-        raise Exception("Need start, end, or cols")
-    return ['%s_%03d'%(base, i) for i in cols]
-
 class HDIRegion(object):
-    """Calculate HDI components for a region."""
-    # Age ranges to grade levels.
-    # label, years, auto, age keys, enrollment keys
+    """Calculate HDI for a region."""
+    # Map of age ranges to grade levels to calculate enrollment,
+    #   and Expected Years of Education.
+    # label, years assigned, auto, age keys, enrollment keys
     eys_groups = [
         # Age: Under 5
-        ['pre-k',   1, True,  acsrange('b01001', cols=(3, 27)),  acsrange('b14007', 3)],
+        ['pre-k',   1, True,  acsrange('b01001', cols=(3, 27)), acsrange('b14007', 3)],
         # Age: 5-9
         ['k-4',     5, True,  acsrange('b01001', cols=(4 ,28)), acsrange('b14007', 4, 8)],
         # Age: 9-14
         ['5-9',     5, True,  acsrange('b01001', cols=(5, 29)), acsrange('b14007', 9, 13)],
         # Age: 15-17
-        ['10-12',   3, True,  acsrange('b01001', cols=(6,30)),  acsrange('b14007', 14, 16)],
+        ['10-12',   3, True,  acsrange('b01001', cols=(6, 30)),  acsrange('b14007', 14, 16)],
         # 17-25
         ['college', 4, False, acsrange('b01001', 7, 11)  + acsrange('b01001', 31, 35), acsrange('b14007', 17)],
         # 25-35
         ['grad',    4, False, acsrange('b01001', 11, 15) + acsrange('b01001', 35, 39), acsrange('b14007', 18)]
     ]    
     
-    # Calculate Mean Years of Schooling (MYS)
-    # label, years, keys
+    # Columns for Mean Years of Schooling
+    # label, years assigned, keys
     mys_groups = [
         # K-12 years
         ['pre-k', 1,  'b15003_003'],
@@ -196,7 +200,9 @@ class HDIRegion(object):
         self.geom = kwargs.get('geom')
         self.countyfp = kwargs.get('countyfp')
         self.statefp = kwargs.get('statefp')
-        print "countyfp/statefp:", self.countyfp, self.statefp
+        self.name = kwargs.get('name') # census tract name
+        self.aland = kwargs.get('aland')
+        self.awater = kwargs.get('awater')
         self.label = self._getlabel()
         self.pop = 0
         # Raw values
@@ -209,22 +215,34 @@ class HDIRegion(object):
         self.lei = None
         self.ii = None
         self.hdi = None
-        print "...label?", self.label
     
     def _getlabel(self):
+        """Display label."""
         c = cityism.acs.ACSFips.ANSI_STATES_COUNTIES.get((self.statefp, self.countyfp))
         s = cityism.acs.ACSFips.ANSI_STATES.get(self.statefp)
-        return "%s, %s"%(c, s)
+        return "%s, %s #%s"%(c, s, self.name)
     
     def data(self):
         """Return dict, e.g. for insert."""
         return self.__dict__
     
+    ##### Calculate HDI Components #####
+    
     def row_eys(self, row):
-        """Calculate Expected Years of Schooling (EYS)."""
+        """Calculate Expected Years of Schooling (EYS).
+        
+        Note that we are estimating expected years of schooling
+        from enrollment by grade level at a single point in time.
+        This may be influenced by local factors such as where 
+        colleges are located, tracts with very few children, etc.
+        It would be better to follow a single cohort of students
+        and measure their enrollment rates over time.
+        """
         r = []
         for label, years, auto, age, enr in self.eys_groups:
+            # Calculate expected enrollment based on pop by age
             pop_expect = float(sum([row[k] for k in age]))
+            # Calculate actual enrollment in the corresponding grades
             pop_enroll = float(sum([row[k] for k in enr]))
             # If pop is zero.
             try:
@@ -234,16 +252,28 @@ class HDIRegion(object):
             # If enrollment is higher than expected..
             if ratio > 1:
                 ratio = 1.0
-            # Some tracts have fuzzy numbers... Just award years.
+            # Some tracts have fuzzy numbers... Just award years for lower grades.
             if ratio < 0.2 and auto:
-                ratio = 1.0                    
+                ratio = 1.0
+            # Expected years of education is sum of 
+            # the enrollment by grade bracket * years in grade bracket.
             r.append(ratio*years)
             print "EYS:", label, ratio, "enroll:", pop_enroll, "expect:", pop_expect, "ratio*years", ratio * years
-        self.eys = sum(r)
+        # Do the sum and round.
+        self.eys = round(sum(r), 3)
         print "EYS final:", self.eys
     
     def row_mys(self, row):
-        """Calculate Mean Years of Schooling (MYS)."""
+        """Calculate Mean Years of Schooling (MYS).
+        
+        This calculation takes each level of educational attainment,
+        and divides by the population of adults over 25 years old.
+        Years are assigned based on how many years of schooling to reach
+        each point. Pre-K is a given year, although I realize it's not
+        universal. So, a high-school graduate is awarded 14 years (prek+k+12),
+        associates degree is 16, ba/bs is 18 years, etc. I use 4 years
+        for grad school (hahaha), although I should look up actual mix.
+        """
         r = []
         pop_25_keys = acsrange('b01001', 11, 25) + acsrange('b01001', 35, 49)
         pop_25 = sum(row[k] for k in pop_25_keys)
@@ -255,11 +285,11 @@ class HDIRegion(object):
             m = sum(r) / float(pop_25)
         except ZeroDivisionError:
             m = 0
-        self.mys = m      
+        self.mys = round(m, 3)  
         print "MYS final:", self.mys
         
     def row_income(self, row):
-        """Calculate income values... This one is easy!"""
+        """Calculate per-capita income values for past 12 months... This one is easy!"""
         self.income = row.get('b19301_001')
         print "income final:", self.income
 
@@ -269,14 +299,12 @@ class HDIRegion(object):
         print "le final:", self.le
 
     def row_pop(self, row):
-        """Population"""
+        """Population."""
         self.pop = row.get('b01001_001')
         print "pop final:", self.pop
         
-    def set_hdi(self, mys_max, eys_max, le_min, le_max, income_min, income_max):
+    def calc_hdi(self, mys_max, eys_max, le_min, le_max, income_min, income_max):
         """Calculate HDI components from previously set income, le, mys, eys."""
-        print "======== HDI:", self.geoid
-        req = [self.mys, self.eys, self.le, self.income]
         if not self.mys:
             raise ValueError("Incomplete data, missing: mys")
         elif not self.eys:
@@ -285,13 +313,26 @@ class HDIRegion(object):
             raise ValueError("Incomplete data, missing: le")
         elif not self.income:
             raise ValueError("Incomplete data, missing: income")
+        req = [self.mys, self.eys, self.le, self.income]
         if 0 in req:
             raise ValueError("ZERO!")
 
+        # HDI is composed of 3 indices:
+        # ... Education Index is geometricmean of MYS / Max observed MYS, and, EYS / Max observed EYS
+        #     (Please read notes in self.row_mys and self.row_eys above)
         self.ei = ( (self.mys / mys_max) * (self.eys / eys_max) ) ** 0.5
+        # ... Income Index is (ln(income) - ln(min income)) / (ln(max income) - ln(income_min))
+        #     (This is designed to show decreasing importance as you approach max income)
         self.ii = ( math.log(self.income) - math.log(income_min) ) / (math.log(income_max) - math.log(income_min) )
+        # ... LE is simple normalized LE. 
+        #     (Since even the lowest US county is ~65 years, 
+        #      you might set min to 50 to decrease importance of this factor)
         self.lei = (self.le - le_min) / (le_max - le_min)
+        # ... Final HDI is geometric mean of 3 indices:
         self.hdi = (self.lei * self.ei * self.ii) ** 0.3333
+        
+        # Round to 3 digits...
+        self.hdi = round(self.hdi, 3)
         print "hdi ei:", self.ei
         print "hdi ii:", self.ii
         print "hdi lei:", self.lei
@@ -308,14 +349,15 @@ class QueryHDI(cityism.query.Query):
     # TileMill notes:
     # +proj=longlat +ellps=GRS80 +datum=NAD83 +no_defs.
     
-    # Calculating HDI
-    # B01001 SEX BY AGE
-    # B14007 SCHOOL ENROLLMENT BY DETAILED    LEVEL OF SCHOOL FOR THE POPULATION 3 YEARS AND OVER
-    # B15003 EDUCATIONAL ATTAINMENT FOR THE POPULATION 25 YEARS AND OVER
-    # B19301 PER CAPITA INCOME IN THE PAST 12 MONTHS (IN 2012 INFLATION-ADJUSTED DOLLARS)
+    # ACS Tables used:
+    #   B01001 SEX BY AGE
+    #   B14007 SCHOOL ENROLLMENT BY DETAILED    LEVEL OF SCHOOL FOR THE POPULATION 3 YEARS AND OVER
+    #   B15003 EDUCATIONAL ATTAINMENT FOR THE POPULATION 25 YEARS AND OVER
+    #   B19301 PER CAPITA INCOME IN THE PAST 12 MONTHS (IN 2012 INFLATION-ADJUSTED DOLLARS)
     
     def query(self, level='tracts', statefp='06', countyfp='075'):
         # Grab the ACS tables for education, income, life expectancy.
+        # Keep aland, awater, labels, etc. handy for future use.
         assert level in ['tracts', 'blocks', 'counties', 'states']
         query = """
             SELECT
@@ -323,6 +365,9 @@ class QueryHDI(cityism.query.Query):
                 %(level)s.geoid,
                 %(level)s.countyfp,
                 %(level)s.statefp,
+                %(level)s.aland,
+                %(level)s.awater,
+                %(level)s.name,
                 ST_AsText(%(level)s.geom) AS geom,
                 data_life_expectancy.value AS le,
                 acs_b01001.*,
@@ -363,16 +408,17 @@ class QueryHDI(cityism.query.Query):
                 regions.append(region)
 
         # Gather the goalposts.
-        mys = filterattr(regions, 'mys', minvalue=0)
-        eys = filterattr(regions, 'eys', minvalue=0)
-        income = filterattr(regions, 'income', minvalue=0)
-        le = filterattr(regions, 'le', minvalue=0)
+        mys = valueattr(regions, 'mys', minvalue=0)
+        eys = valueattr(regions, 'eys', minvalue=0)
+        income = valueattr(regions, 'income', minvalue=0)
+        le = valueattr(regions, 'le', minvalue=0)
 
         # Update HDI components.
-        k = {'mys_max':max(mys), 'eys_max':max(eys), 'le_min':min(le), 'le_max':max(le), 'income_min':min(income), 'income_max':max(income)}
+        # Note: I decided to set LE min to 50 instead of ~65 from the data.
+        k = {'mys_max':max(mys), 'eys_max':max(eys), 'le_min':50.0, 'le_max':max(le), 'income_min':min(income), 'income_max':max(income)}
         for region in regions:
             try:
-                region.set_hdi(**k)        
+                region.calc_hdi(**k)        
             except ValueError, e:
                 print "Skipping:", e
         return regions
@@ -386,17 +432,15 @@ class QueryHDI(cityism.query.Query):
                     print k, v
 
         def statattr(items, key):
-            values = filterattr(items, key, minvalue=0)
+            values = valueattr(items, key, minvalue=0)
             print "Statistics for %s:"%key
             print "\t", "len: %s"%len(items)
-            print "\t", "== None: %s"%(len(filterattr(items, key, value=None, minvalue=None)))
-            print "\t", "== 0.0: %s"%(len(filterattr(items, key, value=0, minvalue=None)))
-            print "\t", ">  0.0: %s"%(len(values))
+            print "\t", "> 0: %s"%(len(values))
             print "\t", "min: %0.2f"%min(values)
             for p in (1, 5, 50, 95, 99):
                 print "\t", "%s: %0.2f"%(p, numpy.percentile(values, p))
             print "\t", "max: %0.2f"%max(values)
-            for p in range(0, 110, 10):
+            for p in range(10, 110, 10):
                 print "\t", "dec %s: %0.2f"%(p, numpy.percentile(values, p))
 
         print "Raw components:"
@@ -408,13 +452,17 @@ class QueryHDI(cityism.query.Query):
 
     def save_query(self, regions, table):
         """Save regions to table."""
+        # Copy the geometry as well to simplify rendering / export.
         query_create = """
             DROP TABLE IF EXISTS %(table)s;
             CREATE TABLE result_hdi (
                 gid serial NOT NULL PRIMARY KEY,
                 geoid varchar,
+                aland float,
+                awater float,
                 statefp varchar,
                 countyfp varchar,
+                name varchar,
                 label varchar,
                 hdi float,
                 lei float,
@@ -432,9 +480,12 @@ class QueryHDI(cityism.query.Query):
         
         query_insert = """
             INSERT INTO %(table)s(
-                geoid, 
+                geoid,
+                aland,
+                awater,
                 statefp,
                 countyfp,
+                name,
                 label,
                 hdi, 
                 ei, 
@@ -449,8 +500,11 @@ class QueryHDI(cityism.query.Query):
             ) 
             VALUES (
                 %%(geoid)s, 
+                %%(aland)s,
+                %%(awater)s,
                 %%(statefp)s,
                 %%(countyfp)s,
+                %%(name)s,
                 %%(label)s,
                 %%(hdi)s,
                 %%(ei)s, 

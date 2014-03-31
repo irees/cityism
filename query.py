@@ -1,19 +1,4 @@
 """Base query."""
-import argparse
-import collections
-import csv
-import json
-import os
-import sys
-import inspect
-import shapefile
-import acs
-import math
-
-import psycopg2
-import psycopg2.extras
-
-import config
 
 CITIES = {
     'Houston': (29.7573869124592, -95.3631898316691),

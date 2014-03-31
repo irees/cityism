@@ -31,15 +31,7 @@ import glob
 # shp2pgsql -p -I -s 4269 tl_2012_us_state.shp states | psql -d acs
 # shp2pgsql -s 4269 -a tl_2012_us_state.shp states | psql -d acs
 
-INTERESTING = ['B08303', 'B01001', 'B01002', 'B01003', 'B02001',
-'B03002', 'B05001', 'B07002', 'B07009', 'B07010', 'B08006', 'B08012', 'B08119',
-'B08121', 'B08124', 'B08126', 'B08134', 'B08141', 'B08301', 'B08519', 'B08521',
-'B08526', 'B08601', 'B09001', 'B09002', 'B13002', 'B15001', 'B15002', 'B15003',
-'B17001', 'B19001', 'B19061', 'B19083', 'B19101', 'B19301', 'B24011', 'B24121',
-'B25001', 'B25002', 'B25003', 'B25004', 'B25009', 'B25010', 'B25012', 'B25014',
-'B25024', 'B25026', 'B25034', 'B25038', 'B25045', 'B25046', 'B25056', 'B25061',
-'B25063', 'B25064', 'B25070', 'B25075', 'B25081', 'B25087', 'B25113', 'B25115',
-'C24010']
+INTERESTING = ['B01001', 'B25034']
 
 class ACSMeta(object):
     """American Community Survey table definitions.
@@ -296,6 +288,12 @@ class ACSFips(object):
                 cls.ANSI_STATES[statefp] = state
                 cls.ANSI_STATES_COUNTIES[(statefp, countyfp)] = county
                 cls.STATES_ANSI[state] = statefp
+                
+    def get_state(self, statefp):
+        return self.ANSI_STATES.get(statefp)
+
+    def get_state_county(self, statefp, countyfp):
+        return self.ANSI_STATES_COUNTIES.get((statefp, countyfp))
         
 ##### Load the ACS Table metadata #####
 

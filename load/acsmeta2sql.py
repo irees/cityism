@@ -1,7 +1,5 @@
-"""Load ACS survey table definitions."""
-
+"""Load ACS table definitions."""
 import argparse
-
 import cityism.acs
 import cityism.config
 

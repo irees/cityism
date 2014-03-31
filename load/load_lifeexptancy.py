@@ -1,3 +1,8 @@
+"""Load IMHE Life Expectancy Data for Counties.
+
+Data source:
+  http://ghdx.healthmetricsandevaluation.org/record/united-states-adult-life-expectancy-state-and-county-1987-2009
+"""
 import csv
 import os
 import sys
