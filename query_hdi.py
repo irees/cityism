@@ -83,7 +83,7 @@ class HDIRegion(object):
         # Assign 2 years for Master's
         ['ms',    20, 'b15003_023'],
         # Assign 4 years for MD / PhD
-        ['md',    24, 'b15003_024'],
+        ['md',    22, 'b15003_024'],
         ['phd',   24, 'b15003_025']
     ]    
 
@@ -114,11 +114,7 @@ class HDIRegion(object):
         """Display label."""
         c = cityism.acs.ACSFips.ANSI_STATES_COUNTIES.get((self.statefp, self.countyfp))
         s = cityism.acs.ACSFips.ANSI_STATES.get(self.statefp)
-        return "%s, %s #%s"%(c, s, self.name)
-    
-    def data(self):
-        """Return dict, e.g. for insert."""
-        return self.__dict__
+        return "%s, %s tract %s"%(c, s, self.name)
     
     def data_rounded(self, r=3):
         """Round data for display."""
@@ -193,8 +189,8 @@ class HDIRegion(object):
         idealized world with universal Pre-K, which gives 1 year. Kindergarten
         is the next year. High school would then be 14 years (1+1+12),
         associates degree is 16 (1+1+12+2), undergraduate degree is 18
-        (1+1+12+4). I optimistically assigned grad school as 4 years (haha),
-        but I'd have to look up the exact mix of MS, Ph.D., MD., etc.
+        (1+1+12+4). Professional school is 22 (...+4). PhD obviously varies, but
+        I assigned 24 years (...+6).
         """
         r = []
         pop_25_keys = acsrange('b01001', 11, 25) + acsrange('b01001', 35, 49)
