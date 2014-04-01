@@ -24,26 +24,38 @@ def parse(filename):
             year = row[3]
             if year == '2009':
                 print state, county, row[4]
-                ret.append([state, county, float(row[4])])
+                # Total life expectancy is mean of male and female
+                le = (float(row[4]) + float(row[5])) / 2
+                row = {
+                    'state': state,
+                    'county': county,
+                    'le': le,
+                    'le_male': row[4],
+                    'le_female': row[5]
+                }
+                ret.append([state, county, le])
     return ret
     
 if __name__ == "__main__":
     ret = parse(sys.argv[1])
     query_create = """
-        CREATE TABLE IF NOT EXISTS data_life_expectancy (
+        DROP TABLE IF EXISTS data_life_expectancy
+        CREATE TABLE data_life_expectancy (
               statefp character varying(2),
               countyfp character varying(3),
-              value float,
+              le float,
+              le_male float,
+              le_female float,
               PRIMARY KEY(statefp, countyfp)
           );
     """
     query_insert = """
-        INSERT INTO data_life_expectancy VALUES (%(statefp)s, %(countyfp)s, %(value)s);
+        INSERT INTO data_life_expectancy VALUES (%(statefp)s, %(countyfp)s, %(le)s, %(le_male)s, %(le_female)s);
     """
 
 
     with cityism.config.connect() as conn:
         cur = conn.cursor()
         cur.execute(query_create)
-        for statefp, countyfp, value in ret:
-            cur.execute(query_insert, {'statefp':statefp, 'countyfp':countyfp, 'value':value})
+        for row in ret:
+            cur.execute(query_insert, row)

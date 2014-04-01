@@ -50,7 +50,7 @@ class HDIRegion(object):
         ['k5-8',    3, True, acsrange('b01001', cols=(5, 29)), acsrange('b14001', 6)],
         ['k9-12',   4, False, acsrange('b01001', 6, 7)  + acsrange('b01001', 30, 31), acsrange('b14001', 7)],
         ['college', 4, False, acsrange('b01001', 8, 11)  + acsrange('b01001', 32, 35), acsrange('b14001', 8)],
-        ['grad',    4, False, acsrange('b01001', 12, 13) + acsrange('b01001', 36, 37), acsrange('b14001', 9)]
+        ['grad',    5, False, acsrange('b01001', 12, 13) + acsrange('b01001', 36, 37), acsrange('b14001', 9)]
     ]
     
     # Columns for Mean Years of Schooling
@@ -83,7 +83,7 @@ class HDIRegion(object):
         ['ms',    20, 'b15003_023'],
         # Assign 4 years for MD / PhD
         ['md',    22, 'b15003_024'],
-        ['phd',   24, 'b15003_025']
+        ['phd',   23, 'b15003_025']
     ]    
 
     def __init__(self, **kwargs):
@@ -247,7 +247,7 @@ class HDIRegion(object):
         #      you might set min to 50 to decrease importance of this factor)
         self.lei = (self.le - le_min) / (le_max - le_min)
         # ... Final HDI is geometric mean of 3 indices:
-        self.hdi = (self.lei * self.ei * self.ii) ** 0.3333
+        self.hdi = (self.lei * self.ei * self.ii) ** (1/3.0)
         print "hdi ei:", self.ei
         print "hdi ii:", self.ii
         print "hdi lei:", self.lei
@@ -257,9 +257,9 @@ class QueryHDI(cityism.query.Query):
     """This map applies the United Nations Development Programme Human
     Development Index (HDI) -- a composite measure of Life Expectancy,
     Education, and Income levels -- to United States census tracts. While the
-    UN HDI spans across the globe, this "disaggregated" HDI is normalized
-    across 74,133 tracts to show relative differences within a single
-    country."""
+    UN HDI spans across the globe, this "disaggregated" HDI is normalized by
+    using goalposts from the 74,133 US tracts to show relative differences
+    within a single country."""
 
     # TileMill notes:
     # +proj=longlat +ellps=GRS80 +datum=NAD83 +no_defs.
@@ -284,7 +284,7 @@ class QueryHDI(cityism.query.Query):
                 %(level)s.awater,
                 %(level)s.name,
                 ST_AsText(%(level)s.geom) AS geom,
-                data_life_expectancy.value AS le,
+                data_life_expectancy.le AS le,
                 acs_b01001.*,
                 acs_b14001.*,
                 acs_b15003.*,
