@@ -20,8 +20,7 @@ For the calculations and notes, see:
         row_eys
         row_le
         row_income
-        calc_hdi
-        
+        calc_hdi        
 """
 import math
 import argparse
@@ -235,11 +234,13 @@ class HDIRegion(object):
         if 0 in req:
             raise ValueError("ZERO!")
         # HDI is composed of 3 indices:
-        # ... Education Index is geometricmean of MYS / Max observed MYS, and, EYS / Max observed EYS
+        # ... Education Index is geometricmean of MYS / Max observed MYS, 
+        #     and, EYS / Max observed EYS
         #     (Please read notes in self.row_mys and self.row_eys above)
         self.ei = ( (self.mys / mys_max) * (self.eys / eys_max) ) ** 0.5
-        # ... Income Index is (ln(income) - ln(min income)) / (ln(max income) - ln(income_min))
-        #     (This is designed to show decreasing importance as you approach max income)
+        # ... Income Index is (ln(income) - ln(min income)) / (ln(max income) 
+        #     - ln(income_min))
+        #     (This is designed to show decreasing importance torwards max)
         self.ii = ( math.log(self.income) - math.log(income_min) ) / (math.log(income_max) - math.log(income_min) )
         # ... LE is simple normalized LE. 
         #     (Since even the lowest US county is ~65 years, 
