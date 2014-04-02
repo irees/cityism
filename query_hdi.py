@@ -36,6 +36,12 @@ import cityism.config
 import cityism.query
 from cityism.utils import *
 
+def checkmax(v, maxvalue=1.0):
+    if v > maxvalue:
+        v = maxvalue
+    return v    
+
+
 class HDIRegion(object):
     """Calculate HDI for a region."""
     # I have included a reference of the ACS columns and values
@@ -45,45 +51,45 @@ class HDIRegion(object):
     #   and Expected Years of Education.
     # label, years assigned, auto, age keys, enrollment keys
     eys_groups = [
-        ['pre-k+k', 2, True, acsrange('b01001', cols=(3, 27)), acsrange('b14001', 3, 4)],
+        ['pre-k+k', 1, True, acsrange('b01001', cols=(3, 27)), acsrange('b14001', 3, 4)],
         ['k1-4',    4, True, acsrange('b01001', cols=(4, 28)), acsrange('b14001', 5)],
-        ['k5-8',    3, True, acsrange('b01001', cols=(5, 29)), acsrange('b14001', 6)],
-        ['k9-12',   4, False, acsrange('b01001', 6, 7)  + acsrange('b01001', 30, 31), acsrange('b14001', 7)],
-        ['college', 4, False, acsrange('b01001', 8, 11)  + acsrange('b01001', 32, 35), acsrange('b14001', 8)],
-        ['grad',    5, False, acsrange('b01001', 12, 13) + acsrange('b01001', 36, 37), acsrange('b14001', 9)]
+        ['k5-8',    4, True, acsrange('b01001', cols=(5, 29)), acsrange('b14001', 6)],
+        ['k9-12',   4, False, acsrange('b01001', cols=(6, 30)) + acsrange('b01001', cols=(7, 31), weight=0.5), acsrange('b14001', 7)],
+        ['college', 4, False, acsrange('b01001', cols=(7, 31), weight=0.5) + acsrange('b01001', 8, 10)  + acsrange('b01001', 32, 34), acsrange('b14001', 8)],
+        ['grad',    5, False, acsrange('b01001', 11) + acsrange('b01001', 35), acsrange('b14001', 9)]
     ]
     
     # Columns for Mean Years of Schooling
     # label, years assigned, keys
     mys_groups = [
         # K-12 years
-        ['pre-k', 1,  'b15003_003'],
-        ['k',     2,  'b15003_004'],
-        ['k1',    3,  'b15003_005'],
-        ['k2',    4,  'b15003_006'],
-        ['k3',    5,  'b15003_007'],
-        ['k4',    6,  'b15003_008'],
-        ['k5',    7,  'b15003_009'],
-        ['k6',    8,  'b15003_010'],
-        ['k7',    9,  'b15003_011'],
-        ['k8',    10, 'b15003_012'],
-        ['k9',    11, 'b15003_013'],
-        ['k10',   12, 'b15003_014'],
-        ['k11',   13, 'b15003_015'],
-        ['k12no', 14, 'b15003_016'],
-        ['k12',   14, 'b15003_017'],
-        ['ged',   14, 'b15003_018'],
-        ['sc1',   14, 'b15003_019'],                
+        ['pre-k', 0,  acsrange('b15003', 3)],
+        ['k',     1,  acsrange('b15003', 4)],
+        ['k1',    2,  acsrange('b15003', 5)],
+        ['k2',    3,  acsrange('b15003', 6)],
+        ['k3',    4,  acsrange('b15003', 7)],
+        ['k4',    5,  acsrange('b15003', 8)],
+        ['k5',    6,  acsrange('b15003', 9)],
+        ['k6',    7,  acsrange('b15003', 10)],
+        ['k7',    8,  acsrange('b15003', 11)],
+        ['k8',    9,  acsrange('b15003', 12)],
+        ['k9',    10, acsrange('b15003', 13)],
+        ['k10',   11, acsrange('b15003', 14)],
+        ['k11',   12, acsrange('b15003', 15)],
+        ['k12no', 13, acsrange('b15003', 16)],
+        ['k12',   13, acsrange('b15003', 17)],
+        ['ged',   13, acsrange('b15003', 18)],
+        ['sc1',   13, acsrange('b15003', 19)],                
         # Assign 2 years for >1yr college, AA
-        ['aa',    16, 'b15003_020'],
-        ['sc2',   16, 'b15003_021'],
+        ['aa',    15, acsrange('b15003', 20)],
+        ['sc2',   15, acsrange('b15003', 21)],
         # Assign 4 years for Bachelor's
-        ['ba',    18, 'b15003_022'],
+        ['ba',    17, acsrange('b15003', 22)],
         # Assign 2 years for Master's
-        ['ms',    20, 'b15003_023'],
+        ['ms',    19, acsrange('b15003', 23)],
         # Assign 4 years for MD / PhD
-        ['md',    22, 'b15003_024'],
-        ['phd',   23, 'b15003_025']
+        ['md',    21, acsrange('b15003', 24)],
+        ['phd',   22, acsrange('b15003', 25)]
     ]    
 
     def __init__(self, **kwargs):
@@ -132,8 +138,8 @@ class HDIRegion(object):
         """Calculate Expected Years of Schooling (EYS).
         
         References:
-        http://www.uis.unesco.org/Education/Documents/gender-atlas-6-en.pdf
         http://glossary.uis.unesco.org/glossary/en/term/2179/en
+        http://www.uis.unesco.org/Education/Documents/gender-atlas-6-en.pdf
         http://stats.uis.unesco.org/unesco/TableViewer/document.aspx?ReportId=121&IF_Language=eng&BR_Country=8400&BR_Region=40500
 
         EYS is the number of years a person can expect to complete. It is
@@ -148,11 +154,11 @@ class HDIRegion(object):
         caps EYS at 18 years. A few college towns (Berkeley) hit the cap.
         """
         r = []
-        for label, years, auto, age, enr in self.eys_groups:
+        for label, years, auto, age_keys, enr_keys in self.eys_groups:
             # Calculate expected enrollment based on pop by age
-            pop_expect = float(sum([row[k] for k in age]))
+            pop_expect = float(sum([row[key.acstable]*key.weight for key in age_keys]))
             # Calculate actual enrollment in the corresponding grades
-            pop_enroll = float(sum([row[k] for k in enr]))
+            pop_enroll = float(sum([row[key.acstable]*key.weight for key in enr_keys]))
             # If pop is zero.
             try:
                 ratio = pop_enroll / pop_expect
@@ -193,10 +199,11 @@ class HDIRegion(object):
         """
         r = []
         pop_25_keys = acsrange('b01001', 11, 25) + acsrange('b01001', 35, 49)
-        pop_25 = sum(row[k] for k in pop_25_keys)
-        for label, years, key in self.mys_groups:
-            print "MYS:", label, years, key, row[key], "years*value:", years*row[key]
-            r.append(years*row[key])
+        pop_25 = sum(row[key.acstable]*key.weight for key in pop_25_keys)
+        for label, years, keys in self.mys_groups:
+            for key in keys:
+                print "MYS:", label, years, key, row[key.acstable], "years*value*weight:", years*row[key.acstable]*key.weight
+                r.append(years*(row[key.acstable]*key.weight))
         print "MYS total:", sum(r)
         try:
             m = sum(r) / float(pop_25)
@@ -220,7 +227,7 @@ class HDIRegion(object):
         self.pop = row.get('b01001_001')
         print "pop final:", self.pop
         
-    def calc_hdi(self, mys_max, eys_max, le_min, le_max, income_min, income_max):
+    def calc_hdi(self, mys_min, mys_max, eys_min, eys_max, le_min, le_max, income_min, income_max, ei_min=0.0, ei_max=1.0):
         """Calculate HDI components from previously set income, le, mys, eys."""
         if not self.mys:
             raise ValueError("Incomplete data, missing: mys")
@@ -233,19 +240,28 @@ class HDIRegion(object):
         req = [self.mys, self.eys, self.le, self.income]
         if 0 in req:
             raise ValueError("ZERO!")
+
         # HDI is composed of 3 indices:
-        # ... Education Index is geometricmean of MYS / Max observed MYS, 
+        # ... Education Index is geometric mean of MYS / Max observed MYS, 
         #     and, EYS / Max observed EYS
         #     (Please read notes in self.row_mys and self.row_eys above)
-        self.ei = ( (self.mys / mys_max) * (self.eys / eys_max) ) ** 0.5
+        # ... I should correct for ei_min and ei_max, but I don't.
+        mys = (self.mys - mys_min) / (mys_max - mys_min)
+        eys = (self.eys - eys_min) / (eys_max - eys_min)
+        # eys = 16.4
+        ei = (checkmax(mys) * checkmax(eys)) ** 0.5
+        self.ei = checkmax(ei / ei_max)
         # ... Income Index is (ln(income) - ln(min income)) / (ln(max income) 
         #     - ln(income_min))
         #     (This is designed to show decreasing importance torwards max)
-        self.ii = ( math.log(self.income) - math.log(income_min) ) / (math.log(income_max) - math.log(income_min) )
+        ii = ( math.log(self.income) - math.log(income_min) ) / ( math.log(income_max) - math.log(income_min) )
+        self.ii = checkmax(ii / ei_max)
         # ... LE is simple normalized LE. 
         #     (Since even the lowest US county is ~65 years, 
         #      you might set min to 50 to decrease importance of this factor)
-        self.lei = (self.le - le_min) / (le_max - le_min)
+        lei = (self.le - le_min) / (le_max - le_min)
+        self.lei = checkmax(lei)
+        
         # ... Final HDI is geometric mean of 3 indices:
         self.hdi = (self.lei * self.ei * self.ii) ** (1/3.0)
         print "hdi ei:", self.ei
@@ -302,11 +318,12 @@ class QueryHDI(cityism.query.Query):
             INNER JOIN
                 data_life_expectancy ON %(level)s.statefp = data_life_expectancy.statefp AND %(level)s.countyfp = data_life_expectancy.countyfp
             WHERE
+                -- tracts.statefp = %%(statefp)s AND
+                -- tracts.countyfp = %%(countyfp)s AND
                 tracts.aland > 0;
         """%{'level':level}
         # WHERE
-        #     tracts.statefp = %%(statefp)s AND
-        #     tracts.countyfp = %%(countyfp)s
+        #     
 
         regions = []
         with self.conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
@@ -328,7 +345,9 @@ class QueryHDI(cityism.query.Query):
         income = valueattr(regions, 'income', minvalue=0)
         le = valueattr(regions, 'le', minvalue=0)
 
+        mys_min    = kwargs.get('mys_min') or min(mys)
         mys_max    = kwargs.get('mys_max') or max(mys)
+        eys_min    = kwargs.get('eys_min') or min(eys)
         eys_max    = kwargs.get('eys_max') or max(eys)
         le_min     = kwargs.get('le_min') or min(le)
         le_max     = kwargs.get('le_max') or max(le)
@@ -338,18 +357,18 @@ class QueryHDI(cityism.query.Query):
         # Update HDI components.
         for region in regions:
             try:
-                region.calc_hdi(mys_max=mys_max, eys_max=eys_max, le_min=le_min, le_max=le_max, income_min=income_min, income_max=income_max)        
+                region.calc_hdi(mys_min=mys_min, mys_max=mys_max, eys_min=eys_min, eys_max=eys_max, le_min=le_min, le_max=le_max, income_min=income_min, income_max=income_max)        
             except ValueError, e:
                 print "Skipping:", e
         return regions
         
     def stats(self, regions):
         """Region statistics."""
-        for region in sorted(regions, key=lambda x:x.hdi):
-            print "==========", region.geoid
-            for k,v in sorted(region.data().items()):
-                if k != 'geom':
-                    print k, v
+        # for region in sorted(regions, key=lambda x:x.hdi):
+        #     print "==========", region.geoid
+        #     for k,v in sorted(region.data_rounded().items()):
+        #         if k != 'geom':
+        #             print k, v
 
         def statattr(items, key):
             values = valueattr(items, key, minvalue=0)
@@ -456,7 +475,9 @@ if __name__ == "__main__":
     with cityism.config.connect() as conn:
         q = QueryHDI(conn=conn)
         # I have decided to set le_min=50 instead of the observed ~65
-        result = q.query(level=args.level, le_min=50)
+        # Goalposts from 2013 HDI report:
+        # http://hdr.undp.org/sites/default/files/hdr_2013_en_technotes.pdf
+        result = q.query(level=args.level, le_min=20, le_max=83.6, mys_min=0.0, mys_max=13.3, eys_min=0.0, eys_max=18.0, income_min=100, income_max=87478, ei_max=0.971)
         if args.save:
             q.save_query(result, table=args.save)
         q.stats(result)
