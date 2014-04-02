@@ -20,6 +20,20 @@ colors_diverge_10 = [
     '#5e4fa2' 
 ]
 
+lala_colors_diverge_10 = [
+    '#d53e4f',
+    '#f46d43',
+    '#fdae61',
+    '#fee08b',
+    '#e6f598',
+    '#abdda4',
+    '#66c2a5',
+    '#3288bd',
+    '#5e4fa2',
+    '#5e4fa2'     
+]
+
+
 def histogram(values, bins=50, weights=None, density=False):
     """Display matpotlib histogram."""
     values = filter(None, values)
@@ -52,6 +66,9 @@ def binstats(bins, key, metric):
     print "Total bins: %s"%len(bins)
     print "Bin metric total:", total_bin
     print "Difference:", total - total_bin
+    for bin in bins:
+        print "min:", bin[1], "max:", bin[2], "pop:", sum(i.get('pop') for i in bin[5]), "aland:", sum(i.get('aland') for i in bin[5])/1e6
+    
     
 def breaks(items, key='hdi', metric='pop', count=10):
     """Break a list of dicts into ranges."""
@@ -71,15 +88,17 @@ def breaks(items, key='hdi', metric='pop', count=10):
     bins = []
     items = sorted(items, key=lambda x:x.get(key), reverse=True)
     for c in range(count-1, -1, -1):
+        refs = []
         t = 0
         start = items[i].get(key)
         while t <= width:
             t += items[i].get(metric)
+            refs.append(items[i])
             if i+1 >= len(items):
                 break
             i += 1
         end = items[i].get(key)
-        bin = (c, end, start, t, t/width)
+        bin = (c, end, start, t, t/width, refs)
         bins.append(bin)
     bins.reverse()    
     return bins
