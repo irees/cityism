@@ -268,10 +268,7 @@ class HDIRegion(object):
 class QueryHDI(cityism.query.Query):
     """This map applies the United Nations Development Programme Human
     Development Index (HDI) -- a composite measure of Life Expectancy,
-    Education, and Income levels -- to United States census tracts. While the
-    UN HDI spans across the globe, this "disaggregated" HDI is normalized by
-    using goalposts from the 74,133 US tracts to show relative differences
-    within a single country."""
+    Education, and Income levels -- to United States census tracts."""
 
     # TileMill notes:
     # +proj=longlat +ellps=GRS80 +datum=NAD83 +no_defs.
