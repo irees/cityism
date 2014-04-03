@@ -41,7 +41,6 @@ def checkmax(v, maxvalue=1.0):
         v = maxvalue
     return v    
 
-
 class HDIRegion(object):
     """Calculate HDI for a region."""
     # I have included a reference of the ACS columns and values
@@ -177,8 +176,6 @@ class HDIRegion(object):
             print "EYS:", label, "enroll:", pop_enroll, "expect:", pop_expect, "ratio: %0.2f"%ratio, "ratio*years: %0.2f"%(ratio * years)
         # Sum.
         self.eys = sum(r)
-        if self.eys > 18:
-            self.eys = 18.0
         print "EYS final:", self.eys
     
     def row_mys(self, row):
@@ -279,40 +276,39 @@ class QueryHDI(cityism.query.Query):
     #   B15003 EDUCATIONAL ATTAINMENT FOR THE POPULATION 25 YEARS AND OVER
     #   B19301 PER CAPITA INCOME IN THE PAST 12 MONTHS (IN 2012 INFLATION-ADJUSTED DOLLARS)
     
-    def query(self, level='tracts', statefp='06', countyfp='075', **kwargs):
+    def query(self, statefp='06', countyfp='075', **kwargs):
         # Grab the ACS tables for education, income, life expectancy.
         # Keep aland, awater, labels, etc. handy for future use.
-        assert level in ['tracts', 'blocks', 'counties', 'states']
         query = """
             SELECT
-                %(level)s.gid,
-                %(level)s.geoid,
-                %(level)s.countyfp,
-                %(level)s.statefp,
-                %(level)s.aland,
-                %(level)s.awater,
-                %(level)s.name,
-                ST_AsText(%(level)s.geom) AS geom,
+                tracts.gid,
+                tracts.geoid,
+                tracts.countyfp,
+                tracts.statefp,
+                tracts.aland,
+                tracts.awater,
+                tracts.name,
+                ST_AsText(tracts.geom) AS geom,
                 data_life_expectancy.le AS le,
                 acs_b01001.*,
                 acs_b14001.*,
                 acs_b15003.*,
                 acs_b19301.*
             FROM
-                %(level)s
+                tracts
             INNER JOIN
-                acs_b01001 ON %(level)s.geoid = acs_b01001.geoid
+                acs_b01001 ON tracts.geoid = acs_b01001.geoid
             INNER JOIN
-                acs_b14001 ON %(level)s.geoid = acs_b14001.geoid
+                acs_b14001 ON tracts.geoid = acs_b14001.geoid
             INNER JOIN
-                acs_b15003 ON %(level)s.geoid = acs_b15003.geoid
+                acs_b15003 ON tracts.geoid = acs_b15003.geoid
             INNER JOIN
-                acs_b19301 ON %(level)s.geoid = acs_b19301.geoid
+                acs_b19301 ON tracts.geoid = acs_b19301.geoid
             INNER JOIN
-                data_life_expectancy ON %(level)s.statefp = data_life_expectancy.statefp AND %(level)s.countyfp = data_life_expectancy.countyfp
+                data_life_expectancy ON tracts.statefp = data_life_expectancy.statefp AND tracts.countyfp = data_life_expectancy.countyfp
             WHERE
                 tracts.aland > 0;
-        """%{'level':level}
+        """
         # WHERE
         #  tracts.statefp = %%(statefp)s AND
         #  tracts.countyfp = %%(countyfp)s AND
