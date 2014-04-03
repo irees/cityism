@@ -6,33 +6,32 @@ import psycopg2.extras
 import cityism.config
 from cityism.utils import *
 
-
-colors_diverge_10 = [
-    '#b32448', # The default is a little too strong for my tastes. '#9e0142'
-    '#d53e4f',
-    '#f46d43',
-    '#fdae61',
-    '#fee08b',
-    '#e6f598',
-    '#abdda4',
-    '#66c2a5',
-    '#3288bd',
-    '#5e4fa2' 
-]
-
-lala_colors_diverge_10 = [
-    '#d53e4f',
-    '#f46d43',
-    '#fdae61',
-    '#fee08b',
-    '#e6f598',
-    '#abdda4',
-    '#66c2a5',
-    '#3288bd',
-    '#5e4fa2',
-    '#5e4fa2'     
-]
-
+# I should just get the colorbrewers library
+COLORS = {
+    'divergent_10': [
+        '#b32448', # The default is a little too strong for my tastes. '#9e0142'
+        '#d53e4f',
+        '#f46d43',
+        '#fdae61',
+        '#fee08b',
+        '#e6f598',
+        '#abdda4',
+        '#66c2a5',
+        '#3288bd',
+        '#5e4fa2' 
+    ],
+    'sequential_9': [
+        '#ffffd9',
+        '#edf8b1',
+        '#c7e9b4',
+        '#7fcdbb',
+        '#41b6c4',
+        '#1d91c0',
+        '#225ea8',
+        '#253494',
+        '#081d58'
+    ]
+}
 
 def histogram(values, bins=50, weights=None, density=False):
     """Display matpotlib histogram."""
@@ -105,6 +104,8 @@ def breaks(items, key='hdi', metric='pop', count=10):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    parser.add_argument("--bins", help="Bins", default=10, type=int)
+    parser.add_argument("--colors", help="Color scheme", default="colors_diverge_10")
     parser.add_argument("--key", help="Histogram column", default='hdi')
     parser.add_argument("--metric", help="Bin metric", default='pop')
     args = parser.parse_args()    
@@ -119,7 +120,7 @@ if __name__ == "__main__":
                 row.pop('geom', None)
                 items.append(row)
 
-    bins = breaks(items, count=10, key=args.key, metric=args.metric)
+    bins = breaks(items, count=args.bins, key=args.key, metric=args.metric)
     binstats(bins=bins, key=args.key, metric=args.metric)
-    histocarto(bins=bins, key=args.key, colors=colors_diverge_10)
+    histocarto(bins=bins, key=args.key, colors=COLORS[args.colors])
 
