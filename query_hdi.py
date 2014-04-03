@@ -51,7 +51,7 @@ class HDIRegion(object):
     #   and Expected Years of Education.
     # label, years assigned, auto, age keys, enrollment keys
     eys_groups = [
-        ['pre-k+k', 1, True, acsrange('b01001', cols=(3, 27)), acsrange('b14001', 3, 4)],
+        ['prek+k0', 1, True, acsrange('b01001', cols=(3, 27)), acsrange('b14001', 3, 4)],
         ['k1-4',    4, True, acsrange('b01001', cols=(4, 28)), acsrange('b14001', 5)],
         ['k5-8',    4, True, acsrange('b01001', cols=(5, 29)), acsrange('b14001', 6)],
         ['k9-12',   4, False, acsrange('b01001', cols=(6, 30)) + acsrange('b01001', cols=(7, 31), weight=0.5), acsrange('b14001', 7)],
@@ -63,8 +63,8 @@ class HDIRegion(object):
     # label, years assigned, keys
     mys_groups = [
         # K-12 years
-        ['pre-k', 0,  acsrange('b15003', 3)],
-        ['k',     1,  acsrange('b15003', 4)],
+        ['prek',  0,  acsrange('b15003', 3)],
+        ['k0',    1,  acsrange('b15003', 4)],
         ['k1',    2,  acsrange('b15003', 5)],
         ['k2',    3,  acsrange('b15003', 6)],
         ['k3',    4,  acsrange('b15003', 7)],
@@ -190,26 +190,25 @@ class HDIRegion(object):
         This is similar to the UIS UNESCO method outlined above. For each level of
         educational attainment, the number of years to reach that level is
         multipled by the percentage of population over 25 years old that
-        reached that level. The MYS is the sum of all levels. I assumed an
-        idealized world with universal Pre-K, which gives 1 year. Kindergarten
-        is the next year. High school would then be 14 years (1+1+12),
-        associates degree is 16 (1+1+12+2), undergraduate degree is 18
-        (1+1+12+4). Professional school is 22 (...+4). PhD obviously varies, but
-        I assigned 24 years (...+6).
+        reached that level. The MYS is the sum of all levels. I ignored pre-K, and started with kindergarten
+        as the first year. High school would then be 13 years (1+12),
+        associates degree is 15 (1+12+2), undergraduate degree is 17
+        (1+12+4). Professional school is 21 (...+4). PhD obviously varies, but
+        I assigned 22 years (...+5).
         """
         r = []
         pop_25_keys = acsrange('b01001', 11, 25) + acsrange('b01001', 35, 49)
         pop_25 = sum(row[key.acstable]*key.weight for key in pop_25_keys)
         for label, years, keys in self.mys_groups:
             for key in keys:
-                print "MYS:", label, years, key, row[key.acstable], "years*value*weight:", years*row[key.acstable]*key.weight
-                r.append(years*(row[key.acstable]*key.weight))
-        print "MYS total:", sum(r)
-        try:
-            m = sum(r) / float(pop_25)
-        except ZeroDivisionError:
-            m = 0.0
-        self.mys = m
+                try:
+                    p = row[key.acstable] / pop_25
+                except ZeroDivisionError:
+                    p = 0.0
+                i = years * p
+                r.append(i)
+                print "MYS:", label, "years:", years, "key:", key.acstable, "value:", row[key.acstable], "pct:", p, "value:", i                
+        self.mys = sum(r)
         print "MYS final:", self.mys
         
     def row_income(self, row):
@@ -318,7 +317,7 @@ class QueryHDI(cityism.query.Query):
             INNER JOIN
                 data_life_expectancy ON %(level)s.statefp = data_life_expectancy.statefp AND %(level)s.countyfp = data_life_expectancy.countyfp
             WHERE
-                -- tracts.statefp = %%(statefp)s AND
+                tracts.statefp = %%(statefp)s AND
                 -- tracts.countyfp = %%(countyfp)s AND
                 tracts.aland > 0;
         """%{'level':level}
