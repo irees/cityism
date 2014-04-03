@@ -87,8 +87,9 @@ class HDIRegion(object):
         ['ba',    17, acsrange('b15003', 22)],
         # Assign 2 years for Master's
         ['ms',    19, acsrange('b15003', 23)],
-        # Assign 4 years for MD / PhD
-        ['md',    21, acsrange('b15003', 24)],
+        # Assign 4 years for professional degree
+        ['prof',    21, acsrange('b15003', 24)],
+        # Assign 5 years for doctorate
         ['phd',   22, acsrange('b15003', 25)]
     ]    
 
@@ -187,14 +188,14 @@ class HDIRegion(object):
         http://www.uis.unesco.org/Education/Documents/mean-years-schooling-indicator-methodology-en.pdf
         http://www.nber.org/papers/w15902.pdf        
         
-        This is similar to the UIS UNESCO method outlined above. For each level of
-        educational attainment, the number of years to reach that level is
+        This is similar to the UIS UNESCO method outlined above. For each level
+        of educational attainment, the number of years to reach that level is
         multipled by the percentage of population over 25 years old that
-        reached that level. The MYS is the sum of all levels. I ignored pre-K, and started with kindergarten
-        as the first year. High school would then be 13 years (1+12),
-        associates degree is 15 (1+12+2), undergraduate degree is 17
-        (1+12+4). Professional school is 21 (...+4). PhD obviously varies, but
-        I assigned 22 years (...+5).
+        reached that level. The MYS is the sum of all levels. I ignored pre-K,
+        and started with kindergarten as the first year. High school would then
+        be 13 years (1+12), associates degree is 15 (1+12+2), undergraduate
+        degree is 17 (1+12+4). Professional school is 21 (...+4). PhD obviously
+        varies, but I assigned 22 years (...+5).
         """
         r = []
         pop_25_keys = acsrange('b01001', 11, 25) + acsrange('b01001', 35, 49)
@@ -244,10 +245,8 @@ class HDIRegion(object):
         # ... Education Index is geometric mean of MYS / Max observed MYS, 
         #     and, EYS / Max observed EYS
         #     (Please read notes in self.row_mys and self.row_eys above)
-        # ... I should correct for ei_min and ei_max, but I don't.
         mys = (self.mys - mys_min) / (mys_max - mys_min)
         eys = (self.eys - eys_min) / (eys_max - eys_min)
-        # eys = 16.4
         ei = (checkmax(mys) * checkmax(eys)) ** 0.5
         self.ei = checkmax(ei / ei_max)
         # ... Income Index is (ln(income) - ln(min income)) / (ln(max income) 
@@ -256,8 +255,6 @@ class HDIRegion(object):
         ii = ( math.log(self.income) - math.log(income_min) ) / ( math.log(income_max) - math.log(income_min) )
         self.ii = checkmax(ii / ei_max)
         # ... LE is simple normalized LE. 
-        #     (Since even the lowest US county is ~65 years, 
-        #      you might set min to 50 to decrease importance of this factor)
         lei = (self.le - le_min) / (le_max - le_min)
         self.lei = checkmax(lei)
         
@@ -317,12 +314,11 @@ class QueryHDI(cityism.query.Query):
             INNER JOIN
                 data_life_expectancy ON %(level)s.statefp = data_life_expectancy.statefp AND %(level)s.countyfp = data_life_expectancy.countyfp
             WHERE
-                tracts.statefp = %%(statefp)s AND
-                -- tracts.countyfp = %%(countyfp)s AND
                 tracts.aland > 0;
         """%{'level':level}
         # WHERE
-        #     
+        #  tracts.statefp = %%(statefp)s AND
+        #  tracts.countyfp = %%(countyfp)s AND
 
         regions = []
         with self.conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
@@ -363,12 +359,6 @@ class QueryHDI(cityism.query.Query):
         
     def stats(self, regions):
         """Region statistics."""
-        # for region in sorted(regions, key=lambda x:x.hdi):
-        #     print "==========", region.geoid
-        #     for k,v in sorted(region.data_rounded().items()):
-        #         if k != 'geom':
-        #             print k, v
-
         def statattr(items, key):
             values = valueattr(items, key, minvalue=0)
             print "Statistics for %s:"%key
@@ -473,7 +463,6 @@ if __name__ == "__main__":
     
     with cityism.config.connect() as conn:
         q = QueryHDI(conn=conn)
-        # I have decided to set le_min=50 instead of the observed ~65
         # Goalposts from 2013 HDI report:
         # http://hdr.undp.org/sites/default/files/hdr_2013_en_technotes.pdf
         result = q.query(level=args.level, le_min=20, le_max=83.6, mys_min=0.0, mys_max=13.3, eys_min=0.0, eys_max=18.0, income_min=100, income_max=87478, ei_max=0.971)
