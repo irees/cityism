@@ -1,4 +1,4 @@
-"""Quick histogram."""
+"""Animation of housing units built by decade."""
 import os
 import argparse
 import numpy
