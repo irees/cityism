@@ -62,11 +62,10 @@ def main():
             with conn.cursor() as cursor:
                 cursor.execute(query_acs_create)    
                 for tract in tracts:
+                    if len(tract.geoid) < 8:
+                        continue
                     print "%s..."%tract.geoid
-                    try:
-                      cursor.execute(query_acs_insert, tract.data)
-                    except Exception, e:
-                      print e
+                    cursor.execute(query_acs_insert, tract.data)
 
 if __name__ == "__main__":
     main()
