@@ -7,30 +7,29 @@ import config
 import query
 
 class QueryRadial(cityism.query.Query):
-    def query(self, city=None, x=None, y=None, acstable='B25034', radius_inner=0, radius_outer=1000, density=True, level='tracts'):
-        assert level in ['tracts', 'blocks', 'counties', 'states']
+    def query(self, city=None, x=None, y=None, acstable='B25034', radius_inner=0, radius_outer=1000, density=True, level='tract_2012'):
         query = """
             WITH 
                 cupcake AS ( SELECT 
-                    utmzone(ST_SetSRID(ST_MakePoint(%%(x)s, %%(y)s), 4269)) AS srid,
+                    utmzone(ST_SetSRID(ST_MakePoint(%%(x)s, %%(y)s), 4326)) AS srid,
                     ST_Difference(
-                            ST_Buffer_Meters(ST_SetSRID(ST_MakePoint(%%(x)s, %%(y)s), 4269), %%(radius_outer)s),
-                            ST_Buffer_Meters(ST_SetSRID(ST_MakePoint(%%(x)s, %%(y)s), 4269), %%(radius_inner)s)
+                            ST_Buffer_Meters(ST_SetSRID(ST_MakePoint(%%(x)s, %%(y)s), 4326), %%(radius_outer)s),
+                            ST_Buffer_Meters(ST_SetSRID(ST_MakePoint(%%(x)s, %%(y)s), 4326), %%(radius_inner)s)
                     ) AS donut
                 )
             SELECT 
-                %(level)s.geoid,
-                ST_Area(ST_Transform(ST_Intersection(%(level)s.geom, cupcake.donut), cupcake.srid)) AS area_intersect,
-                ST_Area(ST_Transform(%(level)s.geom, cupcake.srid)) AS area_tract,
+                geo.geoid,
+                ST_Area(ST_Transform(ST_Intersection(geo.geom, cupcake.donut), cupcake.srid)) AS area_intersect,
+                ST_Area(ST_Transform(geo.geom, cupcake.srid)) AS area_tract,
                 acs_%(acstable)s.*
             FROM
                 cupcake,
-                %(level)s
+                %(level)s AS geo
             INNER JOIN
-                acs_%(acstable)s ON %(level)s.geoid = acs_%(acstable)s.geoid
+                acs_%(acstable)s ON geo.geoid = acs_%(acstable)s.geoid
             WHERE
                 ST_Intersects(
-                    %(level)s.geom,
+                    geo.geom,
                     cupcake.donut
                 );
         """%{'acstable':acstable, 'level':level}
@@ -77,7 +76,7 @@ if __name__ == "__main__":
     parser.add_argument("--acstable", help="ACS Table")
     parser.add_argument("--x", help="X", type=float)
     parser.add_argument("--y", help="Y", type=float)
-    parser.add_argument("--level", help="Census geography level", default="tracts")
+    parser.add_argument("--level", help="Census geography level", default="tract")
     parser.add_argument("--city", help="City")
     parser.add_argument("--start", type=int, default=1000)
     parser.add_argument("--end", type=int, default=30000)

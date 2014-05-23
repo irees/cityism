@@ -222,7 +222,9 @@ class HDIRegion(object):
     def row_pop(self, row):
         """Population."""
         self.pop = row.get('b01001_001')
-        print "pop final:", self.pop
+        self.pop_d = self.pop / self.aland * 1e6
+        self.pop_dmi = self.pop_d * 2.58999
+        print "pop final:", self.pop, "... density:", self.pop_d, self.pop_dmi
         
     def calc_hdi(self, mys_min, mys_max, eys_min, eys_max, le_min, le_max, income_min, income_max, ei_min=0.0, ei_max=1.0):
         """Calculate HDI components from previously set income, le, mys, eys."""
@@ -268,7 +270,7 @@ class QueryHDI(cityism.query.Query):
     Education, and Income levels -- to United States census tracts."""
 
     # TileMill notes:
-    # +proj=longlat +ellps=GRS80 +datum=NAD83 +no_defs.
+    # +proj=longlat +ellps=GRS80 +datum=NAD83 +no_defs
     
     # ACS Tables used:
     #   B01001 SEX BY AGE
@@ -281,37 +283,37 @@ class QueryHDI(cityism.query.Query):
         # Keep aland, awater, labels, etc. handy for future use.
         query = """
             SELECT
-                tracts.gid,
-                tracts.geoid,
-                tracts.countyfp,
-                tracts.statefp,
-                tracts.aland,
-                tracts.awater,
-                tracts.name,
-                ST_AsText(tracts.geom) AS geom,
+                tiger.gid,
+                tiger.geoid,
+                tiger.countyfp,
+                tiger.statefp,
+                tiger.aland,
+                tiger.awater,
+                tiger.name,
+                ST_AsText(tiger.geom) AS geom,
                 data_life_expectancy.le AS le,
                 acs_b01001.*,
                 acs_b14001.*,
                 acs_b15003.*,
                 acs_b19301.*
             FROM
-                tracts
+                tract_2012 AS tiger
             INNER JOIN
-                acs_b01001 ON tracts.geoid = acs_b01001.geoid
+                acs_b01001 ON tiger.geoid = acs_b01001.geoid
             INNER JOIN
-                acs_b14001 ON tracts.geoid = acs_b14001.geoid
+                acs_b14001 ON tiger.geoid = acs_b14001.geoid
             INNER JOIN
-                acs_b15003 ON tracts.geoid = acs_b15003.geoid
+                acs_b15003 ON tiger.geoid = acs_b15003.geoid
             INNER JOIN
-                acs_b19301 ON tracts.geoid = acs_b19301.geoid
+                acs_b19301 ON tiger.geoid = acs_b19301.geoid
             INNER JOIN
-                data_life_expectancy ON tracts.statefp = data_life_expectancy.statefp AND tracts.countyfp = data_life_expectancy.countyfp
+                data_life_expectancy ON tiger.statefp = data_life_expectancy.statefp AND tiger.countyfp = data_life_expectancy.countyfp
             WHERE
-                tracts.aland > 0;
+                tiger.aland > 0;
         """
         # WHERE
-        #  tracts.statefp = %%(statefp)s AND
-        #  tracts.countyfp = %%(countyfp)s AND
+        #  tiger.statefp = %%(statefp)s AND
+        #  tiger.countyfp = %%(countyfp)s AND
 
         regions = []
         with self.conn.cursor(cursor_factory=psycopg2.extras.DictCursor) as cursor:
@@ -394,10 +396,12 @@ class QueryHDI(cityism.query.Query):
                 eys float,
                 income float,
                 le float,
-                pop float        
+                pop float,
+                pop_d float,
+                pop_dmi float
             );
             SELECT 
-                AddGeometryColumn('result_hdi', 'geom', 4269, 'MultiPolygon', 2);
+                AddGeometryColumn('result_hdi', 'geom', 4326, 'MultiPolygon', 2);
         """%{'table':table}
         
         query_insert = """
@@ -418,6 +422,8 @@ class QueryHDI(cityism.query.Query):
                 income, 
                 le,
                 pop,
+                pop_d,
+                pop_dmi,
                 geom
             ) 
             VALUES (
@@ -437,7 +443,9 @@ class QueryHDI(cityism.query.Query):
                 %%(income)s, 
                 %%(le)s,
                 %%(pop)s,
-                ST_GeomFromText(%%(geom)s, 4269)
+                %%(pop_d)s,
+                %%(pop_dmi)s,
+                ST_GeomFromText(%%(geom)s, 4326)
             );
         """%{'table':table}
         
@@ -450,7 +458,7 @@ class QueryHDI(cityism.query.Query):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--level", help="Census geography level", default="tracts")
+    parser.add_argument("--tiger", help="TIGERLine table", default="tract_2012")
     parser.add_argument("--save", help="Save result to table")
     args = parser.parse_args()
     
