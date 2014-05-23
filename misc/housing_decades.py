@@ -69,7 +69,7 @@ class HousingAnimation(object):
     style = mapnik.Style()
     cmap = plt.get_cmap(cmap)
     for value in numpy.linspace(cmin, cmax, bins):
-      color = (value-cmin) / (cmax-cmin) # (cmin-cmax)
+      color = (value-cmin) / (cmax-cmin)
       color = cmaprgb(cmap, color)
       rule = mapnik.Rule()
       print "filter:", key, ">", value
@@ -130,7 +130,7 @@ class HousingAnimation(object):
   def add_xml(self, filename):
     mapnik.load_map(self.m, filename)
 
-  def output(self, filename, lat=29.762131, lon=-95.360608, radius=100000):
+  def render(self, filename, lat=29.762131, lon=-95.360608, radius=100000):
     # self.m.zoom_all()
     x, y = projmerc(lat=lat, lon=lon)
     bbox = x-radius, y-radius, x+radius, y+radius
@@ -160,7 +160,7 @@ def run(xml=None, sql=None, lat=None, lon=None, radius=None, output=None, key=No
     anim.add_label(lon, lat, label)
     
     if args.output:
-      anim.output(args.output, lat=args.lat, lon=args.lon, radius=args.radius)
+      anim.render(args.output, lat=args.lat, lon=args.lon, radius=args.radius)
   
   
 if __name__ == "__main__":
