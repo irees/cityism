@@ -25,13 +25,6 @@ def filterkey(items, key, minvalue=None):
         return [i for i in items if i.get(key) > minvalue]
     return [i for i in items if i.get(key)]
 
-
-
-class ACSWeight(object):
-    def __init__(self, acstable, weight):
-        self.acstable = acstable
-        self.weight = weight
-
 def acsrange(base, start=None, end=None, cols=None, weight=1.0):
     """ACS table column range."""
     if start is not None:
@@ -45,3 +38,9 @@ def acsrange(base, start=None, end=None, cols=None, weight=1.0):
         i = ACSWeight(acstable='%s_%03d'%(base, i), weight=weight)
         ret.append(i)
     return ret
+
+class ACSWeight(object):
+    def __init__(self, acstable, weight):
+        self.acstable = acstable
+        self.weight = weight
+
