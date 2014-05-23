@@ -30,6 +30,13 @@ COLORS = {
         '#225ea8',
         '#253494',
         '#081d58'
+    ],
+    'sequential_5': [
+        '#f1eef6',
+        '#bdc9e1',
+        '#74a9cf',
+        '#2b8cbe',
+        '#045a8d'
     ]
 }
 
@@ -44,7 +51,7 @@ def histogram(values, bins=50, weights=None, density=False):
 
 def histocarto(bins, key, colors):
     """Generate CartoCSS useful for Tilemill. And a legend."""
-    fmt_cartocss = """  [%(key)s > %(bmin)s][%(key)s <= %(bmax)s]{ polygon-fill: %(color)s; line-color: %(color)s; }"""
+    fmt_cartocss = """  [%(key)s > %(bmin)s]{ polygon-fill: %(color)s; line-color: %(color)s; }"""
     fmt_legend =   """    <li><span style="background:%(color)s;"></span>%(min)s</li>"""
     for b, color in zip(bins, colors):
         print fmt_cartocss%{
@@ -68,9 +75,10 @@ def binstats(bins, key, metric):
     for bin in bins:
         print "min:", bin[1], "max:", bin[2], "pop:", sum(i.get('pop') for i in bin[5]), "aland:", sum(i.get('aland') for i in bin[5])/1e6
     
-    
 def breaks(items, key='hdi', metric='pop', count=10):
     """Break a list of dicts into ranges."""
+    # TODO: Use numpy.interpolate
+    
     # This function is somewhat buggy and needs work :(
     # I should ask a real statistician how to do this.
     # numpy has a great percentile method, but doesn't do weights.
@@ -105,10 +113,14 @@ def breaks(items, key='hdi', metric='pop', count=10):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--bins", help="Bins", default=10, type=int)
-    parser.add_argument("--colors", help="Color scheme", default="colors_diverge_10")
+    parser.add_argument("--colors", help="Color scheme", default="divergent_10")
+    parser.add_argument("--mult", help="Key factor (e.g. convert km^2 density to mi^2 = 2.58999)", default=1.0, type=float)    
     parser.add_argument("--key", help="Histogram column", default='hdi')
+    parser.add_argument("--outkey", help="Output key", default=None)
     parser.add_argument("--metric", help="Bin metric", default='pop')
     args = parser.parse_args()    
+
+    args.outkey = args.outkey or args.key
 
     items = []
     with cityism.config.connect() as conn:
@@ -118,9 +130,11 @@ if __name__ == "__main__":
             for row in cursor:
                 row = dict(row)
                 row.pop('geom', None)
+                if row.get(args.key):
+                    row[args.key] = row[args.key] * args.mult
                 items.append(row)
 
     bins = breaks(items, count=args.bins, key=args.key, metric=args.metric)
     binstats(bins=bins, key=args.key, metric=args.metric)
-    histocarto(bins=bins, key=args.key, colors=COLORS[args.colors])
+    histocarto(bins=bins, key=args.outkey, colors=COLORS[args.colors])
 
