@@ -3,7 +3,6 @@
 Author: Ian Rees, 2014.
 
 """
-
 import argparse
 import collections
 import csv
@@ -12,24 +11,6 @@ import os
 import sys
 import inspect
 import glob
-
-# Import TIGER Shapefiles:
-
-# TRACTS
-# shp2pgsql -p -I -s 4269 tl_2012_01_tract.shp tracts | psql -d acs
-# for i in *.shp;do shp2pgsql -s 4269 -a $i tracts | psql -d acs;done
-
-# BLOCKS
-# shp2pgsql -p -I -s 4269 tl_2012_01_tabblock.shp blocks | psql -d acs
-# for i in tl_2012_*tabblock.shp;do shp2pgsql -s 4269 -a $i blocks | psql -d acs;done
-
-# COUNTIES
-# shp2pgsql -p -I -s 4269 tl_2012_us_county.shp counties | psql -d acs
-# shp2pgsql -W LATIN1 -s 4269 -a tl_2012_us_county.shp counties | psql -d acs
-
-# STATES
-# shp2pgsql -p -I -s 4269 tl_2012_us_state.shp states | psql -d acs
-# shp2pgsql -s 4269 -a tl_2012_us_state.shp states | psql -d acs
 
 INTERESTING = ['B01001', 'B25034']
 
