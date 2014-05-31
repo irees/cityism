@@ -59,37 +59,41 @@ class HousingAnimation(object):
     style.rules.append(rule)
     self.m.append_style('label', style)
 
-  def add_query(self, sql, geom='geom', cmin=0, cmax=1000, bins=25, key=None, label=None, cmap='Blues'):
+  def set_query_style(self, key=None, cmin=0, cmax=1000, bins=25, cmap='Blues', style='cmap'):
     cmin = float(cmin)
     cmax = float(cmax)
     assert cmax > cmin
     assert cmax-cmin > 0
-    
+    try:
+      self.m.remove_style('cmap')
+    except KeyError, e:
+      pass
     # Create the rules and filters for the color map
-    style = mapnik.Style()
+    s = mapnik.Style()
     cmap = plt.get_cmap(cmap)
     for value in numpy.linspace(cmin, cmax, bins):
       color = (value-cmin) / (cmax-cmin)
       color = cmaprgb(cmap, color)
       rule = mapnik.Rule()
-      print "filter:", key, ">", value
+      # print "filter:", key, ">", value
       rule.filter = mapnik.Filter("[%s] > %s"%(key, value))
       p = mapnik.PolygonSymbolizer(mapnik.Color(color))
       p.fill_opacity = 0.7
       rule.symbols.append(p)
-      style.rules.append(rule)
-    self.m.append_style('cmap', style)
-    
+      s.rules.append(rule)
+    self.m.append_style(style, s)
+
+  def add_query(self, sql, geom='geom', style='cmap'):
     # Add the PostGIS layer.
-    layer = mapnik.Layer('cmap')
-    layer.styles.append('cmap')
+    layer = mapnik.Layer(style)
+    layer.styles.append(style)
     layer.datasource = mapnik.PostGIS(
       host='localhost',
       user='irees',
       password='',
       dbname='acs',
       table=sql,
-      geometry_field='geom'
+      geometry_field=geom
     )
     self.m.layers.append(layer)    
 
@@ -110,59 +114,36 @@ class HousingAnimation(object):
     # layer.styles.append('label')
     # layer.datasource = ds
     # self.m.layers.append(layer)
-    
-    # Ugh. This is very ugly.
-    y, x = 25.465027, -79.770770
-    sql = """(SELECT ST_SetSRID(ST_Point(%(x)s, %(y)s), 4326) as geom, '%(label)s' AS name) AS ok"""%{'x':x, 'y':y, 'label':label}
-    print sql
-    layer = mapnik.Layer('label')
-    layer.styles.append('label')
-    layer.datasource = mapnik.PostGIS(
-      host=cityism.config.host,
-      user=cityism.config.user,
-      password=cityism.config.password,
-      dbname=cityism.config.dbname,
-      table=sql,
-      geometry_field='geom',
-    )
-    self.m.layers.append(layer)
+    # Ugh. This is very ugly. Just don't do anything until I fix it.
+    pass
+    # y, x = 25.465027, -79.770770
+    # sql = """(SELECT ST_SetSRID(ST_Point(%(x)s, %(y)s), 4326) as geom, '%(label)s' AS name) AS ok"""%{'x':x, 'y':y, 'label':label}
+    # print sql
+    # layer = mapnik.Layer('label')
+    # layer.styles.append('label')
+    # layer.datasource = mapnik.PostGIS(
+    #   host=cityism.config.host,
+    #   user=cityism.config.user,
+    #   password=cityism.config.password,
+    #   dbname=cityism.config.dbname,
+    #   table=sql,
+    #   geometry_field='geom',
+    # )
+    # self.m.layers.append(layer)
 
   def add_xml(self, filename):
     mapnik.load_map(self.m, filename)
 
   def render(self, filename, lat=29.762131, lon=-95.360608, radius=100000):
+    print "Writing:", filename
     # self.m.zoom_all()
     x, y = projmerc(lat=lat, lon=lon)
     bbox = x-radius, y-radius, x+radius, y+radius
-    print "bbox:", bbox
+    # print "bbox:", bbox
     extent = mapnik.Box2d(*bbox)
     self.m.zoom_to_box(extent)
     mapnik.render_to_file(self.m, filename)
 
-def run(xml=None, sql=None, lat=None, lon=None, radius=None, output=None, key=None, label=None, cmin=None, cmax=None, bins=None, cmap=None):
-    anim = HousingAnimation()
-    if args.xml:
-      anim.add_xml(args.xml)
-      
-    # Load the coastline
-    anim.add_shapefile(COASTLINE, 'coastline', 'coastline')
-    
-    # Load the PostGIS data
-    if args.sql:
-      with open(args.sql) as f:
-        sql = f.read()
-      anim.add_query(sql, key=args.key, label=args.label, cmap=args.cmap, cmin=args.cmin, cmax=args.cmax, bins=args.bins)
-
-    # Load the interstates
-    anim.add_shapefile(MOTORWAYS, 'motorways', 'motorways')
-    
-    # Works...
-    anim.add_label(lon, lat, label)
-    
-    if args.output:
-      anim.render(args.output, lat=args.lat, lon=args.lon, radius=args.radius)
-  
-  
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     # Input
@@ -175,19 +156,53 @@ if __name__ == "__main__":
     parser.add_argument("--radius", type=float, default=100000)
 
     # Output
-    parser.add_argument("--output")
+    parser.add_argument("--output", default="city")
     # parser.add_argument("--nx", default=1024, type=int)
     # parser.add_argument("--ny", default=1024, type=int)
 
     # Color map
-    parser.add_argument("--key", default="density_2000_2010")
-    parser.add_argument("--label", default="2000 - 2010")
+    parser.add_argument("--keys", help="Keys", action="append")
+    # parser.add_argument("--label", default="2000 - 2010")
     parser.add_argument("--cmin", default=0, type=int)
     parser.add_argument("--cmax", default=1000, type=int)
     parser.add_argument("--bins", default=25, type=int)
     parser.add_argument("--cmap", default="Blues")
     args = parser.parse_args()
 
-    args.output = "%s.png"%args.key
-    run(**vars(args))
+    print "keys?"
+    print args.keys
+
+    # Setup the map.
+    anim = HousingAnimation()
+
+    # Load XML.
+    if args.xml:
+      anim.add_xml(args.xml)      
+    # Load layers in order:
+    # ... the coastline
+    anim.add_shapefile(COASTLINE, 'coastline', 'coastline')
+    # ... the PostGIS data
+    if args.sql:
+      with open(args.sql) as f:
+        sql = f.read()
+      anim.add_query(sql)
+    # ... the interstates
+    anim.add_shapefile(MOTORWAYS, 'motorways', 'motorways')
     
+    # Works...
+    # anim.add_label(lon, lat, label)
+    for key in args.keys:
+      anim.set_query_style(key=key, cmap=args.cmap, cmin=args.cmin, cmax=args.cmax, bins=args.bins)
+      anim.render("%s.%s.png"%(args.output, key), lat=args.lat, lon=args.lon, radius=args.radius)
+
+
+
+
+
+
+
+
+
+
+
+
