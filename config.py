@@ -6,7 +6,7 @@ import psycopg2.extras
 srid = 4326
 
 host = 'localhost'
-user = 'postgres'
+user = 'irees'
 password = ''
 port = 5432
 dbname = 'acs'
