@@ -7,6 +7,11 @@ import psycopg2.extras
 import cityism.config
 from cityism.utils import *
 
+try:
+  import PIL
+except ImportError:
+  PIL = None
+
 import pyproj
 
 import mapnik
@@ -25,13 +30,15 @@ def projmerc(lon, lat):
   return x, y
 
 class HousingAnimation(object):
-  def __init__(self, m=None):
+  def __init__(self, m=None, nx=1024, ny=1024):
     # Setup the base map
+    self.nx = nx
+    self.ny = ny
     self.m = m or self.setup_map()
     self.setup_styles()
 
   def setup_map(self, m=None):
-    m = mapnik.Map(1024, 1024)
+    m = mapnik.Map(self.nx, self.ny)
     m.background = mapnik.Color('#b8dee6')
     return m
 
@@ -103,33 +110,23 @@ class HousingAnimation(object):
     layer.styles.append(style)
     self.m.layers.append(layer)
   
-  def add_label(self, x, y, label):
-    # Ughghh....!!! Doesn't seem to work :(
-    # p = "POINT(%s %s)"%(x, y)
-    # ds = mapnik.MemoryDatasource()
-    # f = mapnik.Feature(mapnik.Context(), 1)
-    # f.add_geometries_from_wkt(p)
-    # ds.add_feature(f)
-    # layer = mapnik.Layer('label')
-    # layer.styles.append('label')
-    # layer.datasource = ds
-    # self.m.layers.append(layer)
-    # Ugh. This is very ugly. Just don't do anything until I fix it.
-    pass
-    # y, x = 25.465027, -79.770770
-    # sql = """(SELECT ST_SetSRID(ST_Point(%(x)s, %(y)s), 4326) as geom, '%(label)s' AS name) AS ok"""%{'x':x, 'y':y, 'label':label}
-    # print sql
-    # layer = mapnik.Layer('label')
-    # layer.styles.append('label')
-    # layer.datasource = mapnik.PostGIS(
-    #   host=cityism.config.host,
-    #   user=cityism.config.user,
-    #   password=cityism.config.password,
-    #   dbname=cityism.config.dbname,
-    #   table=sql,
-    #   geometry_field='geom',
-    # )
-    # self.m.layers.append(layer)
+  def add_label(self, filename, label, outfile=None, fontsize=None):
+    # if not PIL:
+    #   return
+    # WRITES IN PLACE unless separate outfile kwarg is specified.
+    outfile = outfile or filename
+    if fontsize == None:
+      fontsize = int(self.ny / 20.0)
+    
+    import PIL.Image
+    import PIL.ImageDraw
+    import PIL.ImageFont
+    img = PIL.Image.open(filename)
+    draw = PIL.ImageDraw.Draw(img)
+    font = PIL.ImageFont.truetype("arial.ttf", fontsize) 
+    # PIL.ImageFont.truetype("sans-serif.ttf", 16)
+    draw.text((15, 15), str(label), (0,0,0), font=font)
+    img.save(filename)
 
   def add_xml(self, filename):
     mapnik.load_map(self.m, filename)
@@ -143,6 +140,14 @@ class HousingAnimation(object):
     extent = mapnik.Box2d(*bbox)
     self.m.zoom_to_box(extent)
     mapnik.render_to_file(self.m, filename)
+    
+  def combine_anim(self, infiles, outfile, delay=200, loop=1):
+    args = ['convert', '-delay', str(delay), '-loop', str(loop)]
+    args.extend(infiles)
+    args.append(outfile)
+    import subprocess
+    subprocess.call(args)
+    # convert -delay 200 -loop 0 houston.*.png houston.gif
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -157,23 +162,20 @@ if __name__ == "__main__":
 
     # Output
     parser.add_argument("--output", default="city")
-    # parser.add_argument("--nx", default=1024, type=int)
-    # parser.add_argument("--ny", default=1024, type=int)
+    parser.add_argument("--nx", default=1024, type=int)
+    parser.add_argument("--ny", default=1024, type=int)
 
     # Color map
     parser.add_argument("--keys", help="Keys", action="append")
-    # parser.add_argument("--label", default="2000 - 2010")
+    parser.add_argument("--labels", help="Labels", action="append")
     parser.add_argument("--cmin", default=0, type=int)
     parser.add_argument("--cmax", default=1000, type=int)
     parser.add_argument("--bins", default=25, type=int)
     parser.add_argument("--cmap", default="Blues")
     args = parser.parse_args()
 
-    print "keys?"
-    print args.keys
-
     # Setup the map.
-    anim = HousingAnimation()
+    anim = HousingAnimation(nx=args.nx, ny=args.ny)
 
     # Load XML.
     if args.xml:
@@ -191,11 +193,14 @@ if __name__ == "__main__":
     
     # Works...
     # anim.add_label(lon, lat, label)
-    for key in args.keys:
+    outfiles = []
+    for key, label in zip(args.keys, args.labels):
+      outfile = "%s.%s.png"%(args.output, key)
+      outfiles.append(outfile)
       anim.set_query_style(key=key, cmap=args.cmap, cmin=args.cmin, cmax=args.cmax, bins=args.bins)
-      anim.render("%s.%s.png"%(args.output, key), lat=args.lat, lon=args.lon, radius=args.radius)
-
-
+      anim.render(outfile, lat=args.lat, lon=args.lon, radius=args.radius)
+      anim.add_label(outfile, label)
+    anim.combine_anim(outfiles, "%s.anim.gif"%args.output)
 
 
 
