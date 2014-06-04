@@ -2,7 +2,7 @@ import urllib
 import urllib2
 import json
 
-import cityism.polyline
+import polyline
 
 DEFAULT_ENDPOINT = "http://localhost:8080/otp-rest-servlet/ws"
 
