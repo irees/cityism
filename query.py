@@ -1,14 +1,5 @@
 """Base query."""
 
-CITIES = {
-    'Houston': (29.7573869124592, -95.3631898316691),
-    'Dallas': (32.779411, -96.806802),
-    'Austin': (30.268035, -97.745333),
-    'San Antonio': (29.424761, -98.493591),
-    'Lubbock': (33.585527, -101.845632),
-    'Galveston': (29.299392, -94.794328)
-}
-
 class Query(object):
     def __init__(self, conn=None):
         self.conn = conn
