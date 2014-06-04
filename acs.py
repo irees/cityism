@@ -4,15 +4,30 @@ Author: Ian Rees, 2014.
 
 """
 import argparse
-import collections
 import csv
-import json
 import os
-import sys
 import inspect
-import glob
 
 INTERESTING = ['B01001', 'B25034']
+
+def acsrange(base, start=None, end=None, cols=None, weight=1.0):
+    """ACS table column range."""
+    if start is not None:
+        cols = range(start, (end or start)+1)
+    elif cols:
+        cols = cols
+    else:
+        raise Exception("Need start, end, or cols")
+    ret = []
+    for i in cols:
+        i = ACSWeight(acstable='%s_%03d'%(base, i), weight=weight)
+        ret.append(i)
+    return ret
+
+class ACSWeight(object):
+    def __init__(self, acstable, weight):
+        self.acstable = acstable
+        self.weight = weight
 
 class ACSMeta(object):
     """American Community Survey table definitions.
