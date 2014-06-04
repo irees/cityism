@@ -1,14 +1,14 @@
 """Distribution of population densities."""
-
 import argparse
 import itertools
 import collections
 import numpy as np
+
 import matplotlib.pyplot as plt
 import psycopg2.extras
+
 import cityism.config
 import cityism.acs
-from cityism.utils import *
 
 # Big city geoids.
 # Houston 4835000
@@ -22,6 +22,21 @@ from cityism.utils import *
 # Washington DC 1150000
 # Boston 2507000
 # Phoenix 0455000
+
+# Bay Area Counties
+# Alameda 001
+# Contra Costa 013
+# San Francisco 075
+# San Mateo 081
+# Napa 055
+# Marin 041
+# Santa Clara 085
+# Santa Cruz 087
+# Solano 095
+# Sonoma 097
+
+# Los Angeles counties
+# Los Angeles 037
 
 def plot(items, norm=True):
     # This is ugly. Don't look.
