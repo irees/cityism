@@ -46,7 +46,7 @@ class Trip(object):
     return self.end_time() - self.start_time()
   
   def as_geo(self, sched=None, **kwargs):
-    f = GeoFeature(headsign=self.trip_headsign, **kwargs)
+    f = GeoFeature(name=self.trip_headsign, **kwargs)
     # Check if we have shapes.txt...
     if self.trip.shape_id:
       # Ok, hacky patch to 'gtfs' to pull it out of the sqlite-sqlalchemy db.
@@ -144,10 +144,14 @@ def headways(route, c=None, sched=None):
     kwargs = {
       'headways': headways,
       'headway_min': min(headways),
-      'headway_max': max(headways),
+      'headway_25': numpy.percentile(headways, 25),
       'headway_median': numpy.percentile(headways, 50),
+      'headway_75': numpy.percentile(headways, 75),
+      'headway_max': max(headways),
+      'headway_peak': min([i for i in headways if i > 300]),
       'trips': times,
-      'trip_count': len(trips)
+      'trip_count': len(trips),
+      'route_id': route.route_id
     }
 
     # Get the shape. This is hacky.
