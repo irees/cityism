@@ -23,7 +23,7 @@ c = {
   "features": []
 }
 
-stops = sorted(stops, key=lambda x:x.get('combined'))[:50]
+stops = sorted(stops, key=lambda x:x.get('combined'))
 
 for stop in stops:
   lat = float(stop.pop('lat', 0.0))
