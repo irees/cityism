@@ -24,8 +24,6 @@ For the calculations and notes, see:
 """
 import math
 import argparse
-import json
-
 import numpy
 
 import psycopg2
@@ -34,7 +32,14 @@ import psycopg2.extras
 import cityism.acs
 import cityism.config
 import cityism.query
-from cityism.utils import *
+acsrange = cityism.acs.acsrange
+
+# Just some useful filter functions.
+def valueattr(items, key, minvalue=None):
+    """Return filtered attr values"""
+    if minvalue is not None:
+        return [getattr(i, key, None) for i in items if getattr(i, key, None) > minvalue]
+    return [getattr(i, key, None) for i in items if getattr(i, key, None)]
 
 def checkmax(v, maxvalue=1.0):
     if v > maxvalue:
