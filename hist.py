@@ -1,10 +1,11 @@
 """Quick histogram."""
 import argparse
 import numpy
-import matplotlib.pyplot as plt
+
 import psycopg2.extras
+import matplotlib.pyplot as plt
+
 import cityism.config
-from cityism.utils import *
 
 # I should just get the colorbrewers library
 COLORS = {
@@ -39,6 +40,13 @@ COLORS = {
         '#045a8d'
     ]
 }
+
+def filterkey(items, key, minvalue=None):
+    """Filter objects by key"""
+    if minvalue is not None:
+        return [i for i in items if i.get(key) > minvalue]
+    return [i for i in items if i.get(key)]
+
 
 def histogram(values, bins=50, weights=None, density=False):
     """Display matpotlib histogram."""
