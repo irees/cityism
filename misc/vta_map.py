@@ -11,6 +11,23 @@ import argparse
 
 import gtfs
 
+import cityism.planner
+from cityism.geojson import *
+
+def route_from_stops(stops, planner):
+  # Flip from lon/lat -> lat/lon
+  stops = map(lambda x:(x[1],x[0]), stops)
+  start = stops[0]
+  intermediate = stops[1:-1] # stops[1:-1]
+  end = stops[-1]
+  otp = cityism.planner.getplanner(planner)
+  print "Start:", start
+  print "Intermediate:", intermediate
+  print "End:", end
+  route, duration = otp.plan(start=start, end=end, intermediate=intermediate)
+  print "Route:", route
+  return route
+
 ##### Routes #####
 
 class Route(object):
@@ -45,7 +62,15 @@ class Trip(object):
   def duration(self):
     return self.end_time() - self.start_time()
   
-  def as_geo(self, sched=None, **kwargs):
+  def stops_as_geo(self):
+    ret = []
+    for stop in self.stops:
+      f = GeoFeature(typegeom='Point')
+      f.setcoords((stop.stop.stop_lon, stop.stop.stop_lat))
+      ret.append(f)
+    return ret
+  
+  def route_as_geo(self, sched=None, planner=False, **kwargs):
     f = GeoFeature(name=self.trip_headsign, **kwargs)
     # Check if we have shapes.txt...
     if self.trip.shape_id:
@@ -55,51 +80,17 @@ class Trip(object):
         f.addpoint(stop.shape_pt_lon, stop.shape_pt_lat)
     else:
       # Otherwise, reconstruct the route based on stop locations.
-      for stop in self.stops:
-        f.addpoint(stop.stop.stop_lon, stop.stop.stop_lat)
+      stops = [(stop.stop.stop_lon, stop.stop.stop_lat) for stop in self.stops]
+      #if planner:
+      #  stops = route_from_stops(stops, planner=planner)
+      for lon,lat in stops:
+        f.addpoint(lon,lat)
     return f
     
-##### GeoJSON #####
-
-class GeoFeatureCollection(object):
-  """A geojson FeatureCollection."""
-  def __init__(self):
-    self.collection = {
-      "type": "FeatureCollection",
-      "features": []
-    }
-
-  def add_feature(self, g):
-    self.collection['features'].append(g.feature)
-  
-  def data(self):
-    return self.collection
-
-  def dump(self):
-    return json.dumps(self.data())
-
-class GeoFeature(object):
-  """A geojson Feature."""
-  def __init__(self, typegeom="LineString", coords=None, **kwargs):
-    self.feature = {
-      "type": "Feature",
-      "properties": {},
-      "geometry": {
-        "type": typegeom,
-        "coordinates": coords or []
-      }
-    }
-    self.feature['properties'].update(kwargs)
-    
-  def addpoint(self, lon, lat):
-    self.feature['geometry']['coordinates'].append((lon, lat))
-    
-  def data(self):
-    return self.feature
 
 ##### Main #####
 
-def headways(route, c=None, sched=None):
+def headways(route, c=None, sched=None, planner=False):
   print "\n===== Route: %s ====="%(route)
   c = c or GeoFeatureCollection()
   r = Route(route_id=route.route_id, route=route)
@@ -115,7 +106,7 @@ def headways(route, c=None, sched=None):
     r.add_trip(t)
 
   # Calculate frequencies and build the route shape.
-  for headsign,trips in r.by_headsign().items():
+  for headsign,trips in r.by_headsign().items()[:1]:
     trips = sorted(trips, key=lambda x:x.start_time())
     times = [trip.start_time() for trip in trips]
     endofday = (24*60*60) - times[-1] + times[0]
@@ -155,15 +146,20 @@ def headways(route, c=None, sched=None):
     }
 
     # Get the shape. This is hacky.
-    f = trips[0].as_geo(sched=sched, **kwargs)
-    c.add_feature(f)
-    
+    f = trips[0].route_as_geo(sched=sched, planner=planner, **kwargs)
+    c.addfeature(f)
+
+    # Get the stops.
+    for f in trips[0].stops_as_geo():
+      c.addfeature(f)
+      
 if __name__ == "__main__":
   parser = argparse.ArgumentParser()
   parser.add_argument("filename", help="GTFS .zip file, or cached sqlite DB.")
-  parser.add_argument("outfile", help="GeoJSON output file.")
+  parser.add_argument("--outfile", help="GeoJSON output file.")
   parser.add_argument("--route", help="Run for route; helpful for debugging.", action="append")
   parser.add_argument("--exclude", help="Exclude routes", action="append")
+  parser.add_argument("--planner", help="Reconstruct routes using a trip planner: osrm or otp")
   args = parser.parse_args()
   filename = args.filename
   outfile = args.outfile
@@ -185,9 +181,10 @@ if __name__ == "__main__":
   #   and calculate the headways and route shapes.
   c = GeoFeatureCollection()
   for route in routes:
-    headways(route, c=c, sched=sched)
+    headways(route, c=c, sched=sched, planner=args.planner)
   
   # Write the geojson output.
-  with open(outfile, "w") as f:
-    print f.write(c.dump())
+  if args.outfile:
+    with open(outfile, "w") as f:
+      print f.write(c.dump())
     
