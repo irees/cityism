@@ -1,9 +1,4 @@
 python -m cityism.misc.housing_decades \
-  --nx=400 \
-  --ny=400 \
-  --cmin=25 \
-  --cmax=800 \
-  --radius=60000 \
   --output=$1 \
   --lat=$2 \
   --lon=$3 \
@@ -24,4 +19,9 @@ python -m cityism.misc.housing_decades \
   --keys=density_1990_2000 \
   --labels="1990 - 2000" \
   --keys=density_2000_2010 \
-  --labels="2000 - 2010"
+  --labels="2000 - 2010" \
+  --cmin=25 \
+  --cmax=800 \
+  --radius=60000 \
+  --nx=1024 \
+  --ny=1024 

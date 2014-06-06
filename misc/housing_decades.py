@@ -141,7 +141,7 @@ class HousingAnimation(object):
     self.m.zoom_to_box(extent)
     mapnik.render_to_file(self.m, filename)
     
-  def combine_anim(self, infiles, outfile, delay=200, loop=1):
+  def combine_anim(self, infiles, outfile, delay=200, loop=0):
     args = ['convert', '-delay', str(delay), '-loop', str(loop)]
     args.extend(infiles)
     args.append(outfile)
