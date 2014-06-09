@@ -1,6 +1,6 @@
 import json
 
-class GeoFeatureCollection(object):
+class FeatureCollection(object):
   """A geojson FeatureCollection."""
   def __init__(self):
     self.collection = {
@@ -17,7 +17,7 @@ class GeoFeatureCollection(object):
   def dump(self):
     return json.dumps(self.data())
 
-class GeoFeature(object):
+class Feature(object):
   """A geojson Feature."""
   def __init__(self, typegeom="LineString", coords=None, **kwargs):
     self.feature = {
