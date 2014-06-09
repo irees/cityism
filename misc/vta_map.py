@@ -14,19 +14,53 @@ import gtfs
 import cityism.planner
 from cityism.geojson import *
 
+def chunks(l, n):
+  for i in range(1, len(l), n): 
+    yield l[i-1:i+n]
+  
+
+
 def route_from_stops(stops, planner):
   # Flip from lon/lat -> lat/lon
-  stops = map(lambda x:(x[1],x[0]), stops)
-  start = stops[0]
-  intermediate = stops[1:-1] # stops[1:-1]
-  end = stops[-1]
+  route = []
   otp = cityism.planner.getplanner(planner)
-  print "Start:", start
-  print "Intermediate:", intermediate
-  print "End:", end
-  route, duration = otp.plan(start=start, end=end, intermediate=intermediate)
-  print "Route:", route
+  flip = map(lambda x:(x[1],x[0]), stops)
+  # Find nearest roadway points and, ugh, flip again...
+  # flip = [otp.nearest(i) for i in flip]
+  # flip = map(lambda x:(x[1],x[0]), flip)
+
+  # Find the longest paths...
+  print "Looking for route between %s stops..."%len(flip)
+  print flip
+
+  for i in range(len(flip)-1):
+    start = flip[i]
+    end = flip[i+1]
+    a, _ = otp.plan(start=start, end=end)
+    route.extend(a)
+  
+  # i = 0
+  # while i < len(flip):
+  #   for j in range(len(flip), i, -1):
+  #     chunk = flip[i:j]
+  #     a, _ = otp.plan(start=chunk[0], end=chunk[-1], intermediate=chunk[1:-1])
+  #     print "%s -> %s: found %s points"%(i, j, len(a))
+  #     if a:
+  #       i = j - 1
+  #       route.extend(a)
+  #       break
+  #   i += 1        
   return route
+
+
+  # for chunk in chunks(flip, 1):
+  #   a, _ = otp.plan(start=chunk[0], end=chunk[-1], intermediate=chunk[1:-1])
+  #   print "Stops: %s. Sent request with %s points, got %s points: extending:"%(len(stops), len(chunk), len(a))
+  #   # if not a:
+  #   #  a = chunk
+  #   route.extend(a)
+  # route.append(stops[-1])
+  # return route
 
 ##### Routes #####
 
@@ -64,14 +98,14 @@ class Trip(object):
   
   def stops_as_geo(self):
     ret = []
-    for stop in self.stops:
-      f = GeoFeature(typegeom='Point')
+    for count, stop in enumerate(self.stops):
+      f = Feature(typegeom='Point', stop_sequence=count)
       f.setcoords((stop.stop.stop_lon, stop.stop.stop_lat))
       ret.append(f)
     return ret
   
   def route_as_geo(self, sched=None, planner=False, **kwargs):
-    f = GeoFeature(name=self.trip_headsign, **kwargs)
+    f = Feature(name=self.trip_headsign, **kwargs)
     # Check if we have shapes.txt...
     if self.trip.shape_id:
       # Ok, hacky patch to 'gtfs' to pull it out of the sqlite-sqlalchemy db.
@@ -81,8 +115,8 @@ class Trip(object):
     else:
       # Otherwise, reconstruct the route based on stop locations.
       stops = [(stop.stop.stop_lon, stop.stop.stop_lat) for stop in self.stops]
-      #if planner:
-      #  stops = route_from_stops(stops, planner=planner)
+      if planner:
+        stops = route_from_stops(stops, planner=planner)
       for lon,lat in stops:
         f.addpoint(lon,lat)
     return f
@@ -92,7 +126,7 @@ class Trip(object):
 
 def headways(route, c=None, sched=None, planner=False):
   print "\n===== Route: %s ====="%(route)
-  c = c or GeoFeatureCollection()
+  c = c or FeatureCollection()
   r = Route(route_id=route.route_id, route=route)
 
   # Group by headsign
@@ -179,12 +213,14 @@ if __name__ == "__main__":
 
   # Create the collection, then go through the routes
   #   and calculate the headways and route shapes.
-  c = GeoFeatureCollection()
   for route in routes:
+    c = FeatureCollection()
     headways(route, c=c, sched=sched, planner=args.planner)
+    with open("vta-%s.geojson"%route.route_id, 'w') as f:
+      f.write(c.dump())
   
   # Write the geojson output.
-  if args.outfile:
-    with open(outfile, "w") as f:
-      print f.write(c.dump())
+  # if args.outfile:
+  #   with open(outfile, "w") as f:
+  #     print f.write(c.dump())
     
