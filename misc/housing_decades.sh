@@ -20,6 +20,8 @@ python -m cityism.misc.housing_decades \
   --labels="1990 - 2000" \
   --keys=density_2000_2010 \
   --labels="2000 - 2010" \
+    --keys=density_2010_2012 \
+      --labels="2010 - 2012" \
   --cmin=25 \
   --cmax=800 \
   --radius=60000 \
