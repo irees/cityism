@@ -1,9 +1,9 @@
-python -m cityism.misc.housing_decades \
+python anim.py \
   --output=$1 \
   --lat=$2 \
   --lon=$3 \
-  --sql=$HOME/src/cityism/misc/housing_decades.sql \
-  --xml=$HOME/src/cityism/misc/housing_decades.xml \
+  --sql=housing_decades.sql \
+  --xml=housing_decades.xml \
   --keys=density_0000_1939 \
   --labels="   pre - 1939" \
   --keys=density_1940_1950 \
@@ -20,8 +20,8 @@ python -m cityism.misc.housing_decades \
   --labels="1990 - 2000" \
   --keys=density_2000_2010 \
   --labels="2000 - 2010" \
-    --keys=density_2010_2012 \
-      --labels="2010 - 2012" \
+  --keys=density_2010_2012 \
+  --labels="2010 - 2012" \
   --cmin=25 \
   --cmax=800 \
   --radius=60000 \
