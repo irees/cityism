@@ -30,6 +30,9 @@ class Feature(object):
     }
     self.feature['properties'].update(kwargs)
   
+  def setproperty(self, key, value):
+    self.feature['properties'][key] = value
+  
   def setcoords(self, coords):
     self.feature['geometry']['coordinates'] = coords
 
