@@ -1,0 +1,33 @@
+html { height: 100% }
+body { height: 100%; margin: 0; padding: 0;}
+.cityism-transvisor-loscontrol {
+  margin: 10px;
+  text-align: center;
+}
+.cityism-transvisor-loscontrol input[type=number] {
+  width: 50px;
+}
+.cityism-transvisor-routes {
+  padding: 0px;
+  margin: 0px;
+  list-style: none;
+}
+.cityism-transvisor-routes li {
+  padding: 5px;
+  margin: 0px;
+  border-bottom: 1px dashed #ccc;
+}
+.cityism-transvisor-routes input, 
+.cityism-transvisor-routes button {
+  margin-left: 10px;
+  margin-right: 10px;
+}
+.cityism-transvisor-routes span {
+  cursor: pointer;  
+}
+.cityism-transvisor-route .cityism-transvisor-hover {
+  display:none;
+}
+.cityism-transvisor-route:hover > .cityism-transvisor-hover {
+  display:inline;
+}
