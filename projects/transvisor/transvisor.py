@@ -27,70 +27,34 @@ def route_from_stops(stops, planner):
   return route
 
 ##### Routes #####
+  
+def route_as_geo(route, trips, info=None, sched=None, planner=None):
+  info = info or {}
 
-class Route(object):
-  """Transit route."""
-  def __init__(self, route=None, trips=None):
-    self.route = route
-    self.trips = trips or []
+  # Create the GeoJSON feature.
+  f = Feature(**info)
   
-  def add_trip(self, trip):
-    self.trips.append(trip)
-    
-  def by_headsign(self):
-    h = collections.defaultdict(list)
-    for trip in self.trips:
-      # print pprint.pprint(vars(trip.trip))
-      t = '%s: %s (%s)'%(route.route_short_name, trip.trip.trip_headsign, trip.trip.direction_id)
-      h[t].append(trip)
-    return h
-  
-class Trip(object):
-  """A Trip on a transit Route."""
-  def __init__(self, stops=None, trip=None):
-    self.trip = trip
-    self.stops = stops or []
+  # Check if we have shapes.txt...
+  trip = trips[0]
+  if trip.shape_id:
+    # Ok, hacky patch to pygtfs to pull it out of the sqlite-sqlalchemy db.
+    q = sched.session.query(pygtfs.gtfs_entities.ShapePoint).filter_by(shape_id=trip.shape_id)
+    for stop in q.all():
+      f.addpoint(stop.shape_pt_lon, stop.shape_pt_lat)
+  else:
+    # Otherwise, reconstruct the route based on stop locations.
+    stops = [(stop.stop.stop_lon, stop.stop.stop_lat) for stop in trip.stop_times]
+    if planner:
+      # Try to use a trip planner
+      stops = route_from_stops(stops, planner=planner)
+    for lon,lat in stops:
+      # Otherwise, just a simple line
+      f.addpoint(lon,lat)
+  return f
 
-  def start_time(self):
-    return self.stops[0].arrival_time.seconds
-  
-  def end_time(self):  
-    return self.stops[-1].arrival_time.seconds
-  
-  def duration(self):
-    return self.end_time() - self.start_time()
-  
-  def as_geo(self, sched=None, planner=False, **kwargs):
-    f = Feature(**kwargs)
-
-    # Get the stops
-    f.setproperty('stops', [stop.stop_id for stop in self.stops])
-
-    # Check if we have shapes.txt...
-    if self.trip.shape_id:
-      # Ok, hacky patch to pygtfs to pull it out of the sqlite-sqlalchemy db.
-      q = sched.session.query(pygtfs.gtfs_entities.ShapePoint).filter_by(shape_id=self.trip.shape_id)
-      for stop in q.all():
-        f.addpoint(stop.shape_pt_lon, stop.shape_pt_lat)
-    else:
-      # Otherwise, reconstruct the route based on stop locations.
-      stops = [(stop.stop.stop_lon, stop.stop.stop_lat) for stop in self.stops]
-      if planner:
-        # Try to use a trip planner
-        stops = route_from_stops(stops, planner=planner)
-      for lon,lat in stops:
-        # Otherwise, just a simple line
-        f.addpoint(lon,lat)
-    return f
-    
-class Stop(object):
-  def __init__(self, stop=None, stop_id=None):
-    self.stop = stop
-    self.stop_id = stop_id
-    
-  def as_geo(self):
-    f = Feature(name=str(self.stop), typegeom='Point')
-    f.setcoords((self.stop.stop_lon, self.stop.stop_lat))
+def stop_as_geo(stop):
+    f = Feature(name=str(stop), typegeom='Point')
+    f.setcoords((stop.stop_lon, stop.stop_lat))
     return f
     
 ##### Main #####
@@ -102,31 +66,52 @@ def stopinfo(stop, sched=None):
   
 def routeinfo(route, sched=None, planner=False):
   print "\n===== Route: %s ====="%(route)
-  r = Route(route=route)
-  print vars(route)
+  # Filter by Monday service for now...
+  trips = filter(lambda x:x.service.monday, route.trips)
 
-  # Group by headsign
-  for trip in route.trips:
-    # Weekend service -- skip
-    if not trip.service.monday:
-      continue
-    # Sort the stops by stop_sequence
-    stops = sorted(trip.stop_times, key=lambda x:x.stop_sequence)
-    t = Trip(stops=stops, trip=trip)
-    r.add_trip(t)
+  # Find each route by the sequence of stops...
+  unfurled = {}
+  for trip in trips:
+    trip.stop_times = sorted(trip.stop_times, key=lambda x:x.stop_sequence)
+    # s = tuple(i.stop_id for i in trip.stop_times)
+    # s = trip.direction_id
+    s = (trip.shape_id, trip.direction_id)
+    if s not in unfurled:
+      unfurled[s] = []
+    unfurled[s].append(trip)
 
-  # Calculate frequencies and build the route shape.
-  for headsign,trips in r.by_headsign().items():
-    trips = sorted(trips, key=lambda x:x.start_time())
-    times = [trip.start_time() for trip in trips]
-    kwargs = {
-      'trips': times,
-      'route_id': route.route_id,
-      'name': headsign
-    }
-    # Get the shape. This is hacky.
-    f = trips[0].as_geo(sched=sched, planner=planner, **kwargs)
-    yield f
+  for key,trips in unfurled.items():
+    trips = sorted(trips, key=lambda trip:(trip.stop_times[0].arrival_time.seconds))
+    print "----- Grouped -----"
+    test_shape_id = set([trip.shape_id for trip in trips])
+    test_headsign = set([trip.trip_headsign for trip in trips])
+    test_times = [str(trip.stop_times[0].arrival_time) for trip in trips]
+    print key
+    print test_headsign
+    print test_shape_id
+    print test_times
+
+    # Make sure all headsigns and shapes match
+    try:
+      assert len(test_shape_id) == 1
+    except AssertionError:
+      print "Warning: More than one shape_id!"
+    try:
+      assert len(test_headsign) == 1
+    except AssertionError:
+      print "Warning: More than one headsign!"
+      
+    # Include the trip schedule.
+    # Since stop sequence is identical, just store times
+    # Trip start times
+    r = {}
+    r['route_headsign'] = '%s (%s)'%(trips[0].trip_headsign, trips[0].direction_id)
+    r['route_shape_id'] = trips[0].shape_id
+    r['route_stops']    = [stop.stop_id for stop in trips[0].stop_times]
+    r['route_schedule'] = [[getattr(stop.arrival_time, 'seconds', None) for stop in trip.stop_times] for trip in trips]
+    r['trip_starts']    = [trip.stop_times[0].arrival_time.seconds for trip in trips]
+    yield route_as_geo(route=route, trips=trips, info=r, sched=sched, planner=planner)
+
     
 if __name__ == "__main__":
   parser = argparse.ArgumentParser()
