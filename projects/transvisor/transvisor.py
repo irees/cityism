@@ -41,7 +41,7 @@ class Route(object):
     h = collections.defaultdict(list)
     for trip in self.trips:
       # print pprint.pprint(vars(trip.trip))
-      t = '%s (%s)'%(trip.trip.trip_headsign, trip.trip.direction_id)
+      t = '%s: %s (%s)'%(route.route_short_name, trip.trip.trip_headsign, trip.trip.direction_id)
       h[t].append(trip)
     return h
   
@@ -103,6 +103,7 @@ def stopinfo(stop, sched=None):
 def routeinfo(route, sched=None, planner=False):
   print "\n===== Route: %s ====="%(route)
   r = Route(route=route)
+  print vars(route)
 
   # Group by headsign
   for trip in route.trips:

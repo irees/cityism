@@ -36,6 +36,8 @@ function gtfsControl(element, map) {
 gtfsControl.prototype.build = function() {
   var self = this;
   this.element.empty();
+  $('<div style="text-align:center">UNDER DEVELOPMENT</div>').appendTo(this.element);
+  
   var los = $('<div />')
     .text('Period to calculate LOS')
     .addClass('cityism-transvisor-loscontrol')
@@ -86,6 +88,7 @@ gtfsControl.prototype.add_gtfs = function(uri, data, redraw) {
   redraw = true;
   if (redraw) {
     this.redraw();
+    this.fit_all();
   }
 }
 gtfsControl.prototype.calc_los = function(feature, start, end) {
@@ -103,6 +106,16 @@ gtfsControl.prototype.calc_los = function(feature, start, end) {
     }
   }
   return i
+}
+gtfsControl.prototype.fit_all = function() {
+  var max_ne = 0;
+  var max_sw = 0;
+  var bounds = null;
+  this.layer.eachLayer(function(i){
+    if (bounds==null) {bounds=i.getBounds()}
+    bounds.extend(i.getBounds());
+  });
+  this.map.fitBounds(bounds);
 }
 gtfsControl.prototype.hide_all = function() {
   $('.cityism-transvisor-route input:checkbox').trigger('off');
