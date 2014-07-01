@@ -59,7 +59,7 @@
 
         // GTFS Control.
         var gtfsc = new gtfsControl($('#cityism-transvisor-controls'), map);
-        var agency = get_qs('agency') || 'test';
+        var agency = get_qs('agency') || 'actransit';
         gtfsc.load_gtfs(agency+".geojson");
     </script>
 

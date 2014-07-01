@@ -101,12 +101,13 @@ gtfsControl.prototype.show_all = function() {
   $('.cityism-transvisor-route input:checkbox').trigger('on');
 }
 /***** Popups *****/
-gtfsControl.prototype.show_loscontrol = function() {
+gtfsControl.prototype.show_loscontrol = function(elem) {
   // Level of Service Control
   var self = this;
   // Make a new class?
-  var elem = $('<div />')
-    .attr('title', 'Level of Service Options');
+  var loscontrol = $('<div />')
+    .attr('title', 'Level of Service Options')
+    .appendTo(elem);
     
   // Control form.
   var f = $('<form />')
@@ -120,7 +121,7 @@ gtfsControl.prototype.show_loscontrol = function() {
     .css('padding', 10)
     .wrap('<div />')
     .text("Period:")
-    .appendTo(elem);
+    .appendTo(loscontrol);
     
   $('<select />').append('<option>Weekday</option>').appendTo(f);
   $('<input type="number" name="los_start" />').val(7).appendTo(f);
@@ -149,6 +150,8 @@ gtfsControl.prototype.build = function() {
   var legend = $('<div />')
     .addClass('cityism-transvisor-loscontrol')
     .appendTo(this.element);
+
+  this.show_loscontrol(legend);
 
   for (var i in LOS) {
     $('<div />')

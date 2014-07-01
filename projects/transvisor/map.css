@@ -6,6 +6,7 @@ body { height: 100%; margin: 0; padding: 0;}
   border-bottom: 2px solid red;
 }
 .cityism-transvisor-loscontrol input[type=number] {
+  width: 30px;
 }
 .cityism-transvisor-routes {
   padding: 0px;
