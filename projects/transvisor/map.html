@@ -4,9 +4,9 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=1024, user-scalable=no">
 
-    <link  href="//cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.3/leaflet.css" rel="stylesheet" />
-    <link rel="stylesheet" href="//ajax.googleapis.com/ajax/libs/jqueryui/1.10.4/themes/smoothness/jquery-ui.css" />
-    <link  href="map.css" rel="stylesheet" />
+    <link href="//cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.3/leaflet.css" rel="stylesheet" />
+    <link href="//ajax.googleapis.com/ajax/libs/jqueryui/1.10.4/themes/smoothness/jquery-ui.css" rel="stylesheet" />
+    <link href="map.css" rel="stylesheet" />
 
     <script src="//ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
     <script src="//ajax.googleapis.com/ajax/libs/jqueryui/1.10.4/jquery-ui.min.js"></script>
@@ -19,44 +19,49 @@
         font-size: 10pt;
       }
       #cityism-transvisor-controls {
-        width: 400px;
-        height: 100%;
-        border-right:solid 2px red;
+        margin: 0px;
+        width: 350px;
         float: left;
+        height: 100%;
         overflow: scroll;
       }
       #map {
-        width: 800px;
+        margin: 0px;
+        margin-left: 350px;
         height: 100%;
       }
     </style>
+    
   </head>
   <body>
       <div id="cityism-transvisor-controls"></div>
       <div id="map"></div>
-      <script type="text/javascript">  
-        // Setup the map.
-        var map = L.map('map').setView([37.80, -122.14], 11);
-        L.tileLayer('https://{s}.tiles.mapbox.com/v3/{id}/{z}/{x}/{y}.png', {
-        	maxZoom: 18,
-        	id: 'examples.map-20v6611k',
-    			attribution: 'Map data &copy; <a href="http://openstreetmap.org">OpenStreetMap</a> contributors, ' +
-    				'<a href="http://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>, ' +
-    				'Imagery © <a href="http://mapbox.com">Mapbox</a>',
-        }).addTo(map);
-        var gtfsc = new gtfsControl($('#cityism-transvisor-controls'), map);
+      <div style="clear:both"></div>
 
-        var agency = get_qs('agency') || 'actransit';
+      <script>  
+        // Setup the map.
+  	    var mbAttr = 'Map data &copy; <a href="http://openstreetmap.org">OpenStreetMap</a> contributors, ' +
+  				'<a href="http://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>, ' +
+  				'Imagery © <a href="http://mapbox.com">Mapbox</a>'
+  			var mbUrl = 'https://{s}.tiles.mapbox.com/v3/{id}/{z}/{x}/{y}.png';
+  	    var grayscale = L.tileLayer(mbUrl, {id: 'examples.map-20v6611k', attribution: mbAttr});
+  		  var streets = L.tileLayer(mbUrl, {id: 'examples.map-i86knfo3',   attribution: mbAttr});
+    		var map = L.map('map', {
+    			center: [0,0],
+    			zoom: 2,
+    			layers: [grayscale]
+    		});
+    		var baseLayers = {
+    			"Grayscale": grayscale,
+    			"Streets": streets
+    		};
+        L.control.layers(baseLayers).addTo(map);
+
+        // GTFS Control.
+        var gtfsc = new gtfsControl($('#cityism-transvisor-controls'), map);
+        var agency = get_qs('agency') || 'test';
         gtfsc.load_gtfs(agency+".geojson");
-        
-        // gtfsc.load("sfmta.geojson");
-        // add_gtfs(map, 'test.geojson', los_ranges);
-        // add_gtfs(map, 'actransit.geojson', los_ranges);
-        // add_gtfs(map, 'samtrans.geojson', los_ranges);
-        // add_gtfs(map, 'sfmta.geojson', los_ranges);
-        // add_gtfs(map, 'vta.geojson', los_ranges);
-        // add_gtfs(map, 'caltrain.geojson', los_ranges);
-        // add_gtfs(map, 'bart.geojson', los_ranges);
     </script>
+
   </body>
 </html>
