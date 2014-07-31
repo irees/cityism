@@ -77,6 +77,16 @@ class OpenTripPlanner(Planner):
       duration = self._getduration(response)
     return line, duration
 
+  def isochrone(self, start, mode=None, maxwalk=2000, contours=None, date=None, time=None):
+    start = fjoin(start)
+    date = '2014/07/21'
+    time = '08:00:00'
+    mode = mode or 'WALK,TRANSIT'
+    contours = contours or [900, 1800, 2700, 3600]
+    # isochrone?fromPlace=37.77683,-122.39474&date=2014/07/21&time=09:00:00&maxWalkDistance=2000&mode=WALK,TRANSIT&cutoffSec=900&cutoffSec=1800&cutoffSec=2700&cutoffSec=3600    
+    response = self.call("isochrone", fromPlace=start, cutoffSec=contours, mode=mode, maxWalkDistance=maxwalk, date=date, time=time)
+    return response
+
   def _getduration(self, response):
     itin = response['plan']['itineraries'][0]
     return itin['duration']
