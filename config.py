@@ -9,7 +9,7 @@ host = 'localhost'
 user = 'irees'
 password = ''
 port = 5432
-dbname = 'acs'
+dbname = 'irees'
 
 def connect(**kwargs):
     kw = {'dbname': dbname, 'user': user, 'password': password, 'host':host, 'port': port}

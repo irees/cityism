@@ -103,13 +103,4 @@ class OpenTripPlanner(Planner):
 if __name__ == "__main__":
   otp = OSRM()
   route, duration = otp.plan(start=(37.79398,-122.39524), end=(37.422,-122.084058), mode='CAR')
-  import cityism.geojson
-  c = cityism.geojson.FeatureCollection()
-  f = cityism.geojson.Feature()
-  for point in route:
-    f.addpoint(point[0], point[1])
-  c.addfeature(f)
-  print c.dump()
-
-
-
+  

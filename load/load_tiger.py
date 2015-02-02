@@ -3,15 +3,17 @@ import sys
 import argparse
 import subprocess
 
-def psql_pipe(cmd, database='acs'):
+def psql_pipe(cmd, database='irees'):
     psqlcmd = ['psql', '-d', database]
+    print psqlcmd
+    print cmd
     p1 = subprocess.Popen(cmd, stdout=subprocess.PIPE)
     p2 = subprocess.Popen(psqlcmd, stdin=p1.stdout, stdout=subprocess.PIPE)
     p1.stdout.close()
     print p2.communicate()[0]
 
 class ShapeLoader(object):
-    def __init__(self, table, database='acs', srid_in=4269, srid_out=4326):
+    def __init__(self, table, database='irees', srid_in=4269, srid_out=4326):
         self.database = database
         self.table = table
         self.srid_in = srid_in
