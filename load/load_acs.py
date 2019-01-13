@@ -5,8 +5,8 @@ import cityism.config
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--year", help="Year", default=2012)
-    parser.add_argument("--span", help="Span", default=5)
+    parser.add_argument("--year", help="Year", default=2012, type=int)
+    parser.add_argument("--span", help="Span", default=5, type=int)
     parser.add_argument("--state", help="State", default='*')
     parser.add_argument("--acstable", help="ACS Table")
     args = parser.parse_args()
@@ -62,9 +62,10 @@ def main():
             with conn.cursor() as cursor:
                 cursor.execute(query_acs_create)    
                 for tract in tracts:
-                    if len(tract.geoid) < 8:
-                        continue
+                    # if len(tract.geoid) < 8:
+                    #    continue
                     print "%s..."%tract.geoid
+                    print tract.__dict__
                     cursor.execute(query_acs_insert, tract.data)
 
 if __name__ == "__main__":

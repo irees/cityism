@@ -26,12 +26,9 @@ END;
 $BODY$ LANGUAGE 'plpgsql' IMMUTABLE
 COST 100;
 
-
-
 /* Function: ST_Buffer_Meters(geometry, double precision)
 DROP FUNCTION ST_Buffer_Meters(geometry, double precision);
 Usage: SELECT ST_Buffer_Meters(the_geom, num_meters) FROM sometable; */
- 
  
 CREATE OR REPLACE FUNCTION ST_Buffer_Meters(geometry, double precision)
 RETURNS geometry AS

@@ -1,23 +1,25 @@
 """Radial query."""
 import math
 import argparse
+import csv
+import sys
 
 import acs
 import config
 import query
 
-class QueryRadial(cityism.query.Query):
-    def query(self, city=None, x=None, y=None, acstable='B25034', radius_inner=0, radius_outer=1000, density=True, level='tract_2012'):
+class QueryRadial(query.Query):
+    def query(self, lon=None, lat=None, acstable='B25034', radius_inner=0, radius_outer=1000, density=True, level='tract'):
         query = """
-            WITH 
-                cupcake AS ( SELECT 
-                    utmzone(ST_SetSRID(ST_MakePoint(%%(x)s, %%(y)s), 4326)) AS srid,
+            WITH
+                cupcake AS ( SELECT
+                    utmzone(ST_SetSRID(ST_MakePoint(%%(lon)s, %%(lat)s), 4326)) AS srid,
                     ST_Difference(
-                            ST_Buffer_Meters(ST_SetSRID(ST_MakePoint(%%(x)s, %%(y)s), 4326), %%(radius_outer)s),
-                            ST_Buffer_Meters(ST_SetSRID(ST_MakePoint(%%(x)s, %%(y)s), 4326), %%(radius_inner)s)
+                            ST_Buffer_Meters(ST_SetSRID(ST_MakePoint(%%(lon)s, %%(lat)s), 4326), %%(radius_outer)s),
+                            ST_Buffer_Meters(ST_SetSRID(ST_MakePoint(%%(lon)s, %%(lat)s), 4326), %%(radius_inner)s)
                     ) AS donut
                 )
-            SELECT 
+            SELECT
                 geo.geoid,
                 ST_Area(ST_Transform(ST_Intersection(geo.geom, cupcake.donut), cupcake.srid)) AS area_intersect,
                 ST_Area(ST_Transform(geo.geom, cupcake.srid)) AS area_tract,
@@ -33,26 +35,24 @@ class QueryRadial(cityism.query.Query):
                     cupcake.donut
                 );
         """%{'acstable':acstable, 'level':level}
-    
-        if city:
-            y,x = CITIES[city]
-        if x is None or y is None:
-            raise Exception("Need x, y coords.")
-    
+
+        if lon is None or lat is None:
+            raise Exception("Need lon, lat.")
+
         if not acstable:
             raise Exception("No ACS table given.")
-        
+
         if radius_inner > radius_outer:
             radius_inner = radius_outer
         if radius_outer > 100000:
             raise Exception("Max 100km.")
         if radius_inner < 0:
             raise Exception("Min 0km.")
-    
+
         plot = []
         data = []
         area = 0
-        params = {'radius_outer':radius_outer, 'radius_inner':radius_inner, 'x':x, 'y':y}        
+        params = {'radius_outer':radius_outer, 'radius_inner':radius_inner, 'lon':lon, 'lat':lat}
         with self.conn.cursor() as cursor:
             cursor.execute(query, params)
             for row in cursor:
@@ -68,36 +68,35 @@ class QueryRadial(cityism.query.Query):
             total = sum(i)
             if density:
                 total /= (area / 1e6)
-            plot.append(total)        
+            plot.append(total)
         return plot
-        
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--acstable", help="ACS Table")
-    parser.add_argument("--x", help="X", type=float)
-    parser.add_argument("--y", help="Y", type=float)
+    parser.add_argument("--lon", help="Longitude", type=float)
+    parser.add_argument("--lat", help="Latitude", type=float)
     parser.add_argument("--level", help="Census geography level", default="tract")
-    parser.add_argument("--city", help="City")
     parser.add_argument("--start", type=int, default=1000)
-    parser.add_argument("--end", type=int, default=30000)
+    parser.add_argument("--end", type=int, default=50000)
     parser.add_argument("--width", type=int, default=1000)
-    parser.add_argument("--density", type=bool, help="Plot density instead of counts")
-    parser.add_argument("--reverse", type=bool, help="Reverse column output")
     args = parser.parse_args()
-    
+
     plots = []
-    with cityism.config.connect() as conn:
+    with config.connect() as conn:
         for radius in range(args.start, args.end, args.width):
-            plot = QueryRadial(conn=conn).query(city=args.city, acstable=args.acstable, radius_inner=radius, radius_outer=radius+args.width, level=args.level)
+            plot = QueryRadial(conn=conn).query(acstable=args.acstable, radius_inner=radius, radius_outer=radius+args.width, level=args.level, lon=args.lon, lat=args.lat)
             plots.append(plot)
 
     # Ugly, dirty csv. Fix me.
-    params = cityism.acs.ACSMeta.get(args.acstable).getchildren()
-    if args.reverse:
-        params.reverse()
-    print "Radial distribution query:"
-    print "\t" + "\t".join(i.title for i in params)
+    params = acs.ACSMeta.get(args.acstable).getchildren()
+    writer = csv.writer(sys.stdout)
+    writer.writerow(['Radial distribution query:'])
+    writer.writerow(['lon',args.lon])
+    writer.writerow(['lat',args.lat])
+    writer.writerow(['geography',args.level])
+    writer.writerow(['width',args.width])
+    writer.writerow([])
+    writer.writerow(['']+[i.title for i in params])
     for count, row in enumerate(plots):
-        if args.reverse: row.reverse()
-        print "%s\t"%(count) + "\t".join('%0.3f'%i for i in row)
-        
+      writer.writerow([count]+['%0.3f'%i for i in row])
